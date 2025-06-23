@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Vachana Cloning</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_1234.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/popup2.css' %}">
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="icon_VC">
+            <h3 id="leaveBtn" onclick="disconnectRoom()">Vachana Cloning</h3>
+            &nbsp;
+            <button onclick="displayCreateRoomPopup()">สร้างห้อง</button>
+        </div>
+        <div id="createRoomModal" class="modal" style="display: none;">
+            <form id="createRoomForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="text" id="roomName" name="name" placeholder="Enter room name" required>
+                <input type="file" id="roomImage" name="image" accept="image/*">
+                <button type="button" onclick="createRoom()"
+                    data-url="{% url 'voice_chat:create_room' %}">Create</button>
+                <button type="button" onclick="closeCreateRoomModal()">Cancel</button>
+            </form>
+        </div>
+        <br>
+        <div class="group_search">
+            <svg class="icon_search" aria-hidden="true" viewBox="0 0 24 24" onclick="searchRoom()">
+                <g>
+                    <path
+                        d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z">
+                    </path>
+                </g>
+            </svg>
+            <input placeholder="ค้นหาห้อง" type="search" class="input_search" id="searchRoom"
+                onkeydown="handleSearch(event)">
+        </div>
+        <br>
+
+        <!-- Popup ยืนยันเข้าร่วมห้อง -->
+        <!-- <div id="roomPopup" class="popup" data-invite="{{ invite_code }}" style="display: none;">
+            <div class="popup-content">
+                <img id="popupRoomImage" src="/media/default/room.jpg" alt="รูปห้อง">
+                <h3 id="popupRoomName">ชื่อห้อง</h3>
+                <button onclick="joinRoomPopup()">✅ เข้าร่วม</button>
+                <button onclick="closePopup()">❌ ยกเลิก</button>
+            </div>
+        </div> -->
+        <ul id="roomList" class="room-list">
+            {% for room in rooms %}
+            <li onclick="loadRoom('{{ room.id }}', '{{ room.name }}', '{{ room.invite_code }}')">
+                <img src="{{ room.image.url }}" onerror="this.src='/media/default/room.jpg'">
+                <span>{{ room.name }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="main-content-area">
+        <div class="titles-container">
+            <div class="room-title" data-menu-trigger-for="settingsMenu">
+                <h2 id="roomTitle">วัจนะโคลนนิ่ง ยินดีต้อนรับ 🥳</h2>
+                <div class="menu-anchor-point">
+                    <span id="munublock" class="menu-indicator-icon" style="display: none;">▽</span>
+
+                    <div id="settingsMenu" class="popup-menu room-settings-specific-styles">
+                        <ul>
+                            <li>ตั้งค่าห้อง</li>
+                            <li onclick="copyInviteLink()">🔗 คัดลอกลิงก์</li>
+                            <li id="copyRoomCodeBtn" onclick="copyRoomCode()" style="display: none;">📄 คัดลอกรหัสห้อง
+                            </li>
+                            <li onclick="confirmLeaveRoom()" style="color: #dd6860;">🚪 ออกจากห้อง</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="voie-room-title">
+                <h2 id="roomTitle">ห้องพูดคุย</h2>
+            </div>
+        </div>
+        <div class="main-body-content-wrapper">
+            <div class="chat-room">
+            </div>
+            <div class="voice-room">
+            </div>
+        </div>
+    </div>
+    <div class="right-column-area">
+        <div class="user-container">
+            <div id="settingsBtn">
+            </div>
+            <div class="user-body">
+                <ul id="member-list"></ul>
+                <div class="user-header">
+                    <!-- <button id="settingsBtn" onclick="toggleSettingsMenu()" style="display:none;">ตั้งค่าห้อง</button> -->
+                </div>
+                <h3 id="welcome-message">สวัสดีชาวโลก</h3>
+                <h3 id="users-header" style="display: none;">ผู้ใช้</h3>
+                <ul id="userList" class="user-list"></ul>
+            </div>
+        </div>
+        <div id="currentUserMenu" class="user-profile-options-menu">
+            <ul>
+                <li onclick="displayEditProfileModal()">แก้ไขโปรไฟล์</li>
+                <li>เปลี่ยนสถานะ <span id="userMenuStatusText">[ออนไลน์]</span></li>
+                <li>โหมด[มืด]</li>
+                <li onclick="confirmlogout()" style="color: #dd6860;">ออกจากระบบ</li>
+            </ul>
+        </div>
+        <div class="current-user-display" onclick="toggleCurrentUserMenu()"> <img
+                src="{{ request.user.get_profile_image_url }}" alt="User Avatar for {{ request.user.username }}"
+                class="current-user-avatar-img">
+            <span class="current-user-name-text">{{ request.user.display_name }}</span>
+            <div class="current-user-options-trigger">⋮</div>
+        </div>
+    </div>
+
+    <div id="genericModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content-box">
+            <div class="modal-header">
+                <h2 id="genericModalTitle">หัวข้อ Popup</h2> <span class="modal-close-btn"
+                    onclick="closeGenericModal()">&times;</span>
+            </div>
+            <div id="genericModalBody" class="modal-body">
+                <p>เนื้อหาเริ่มต้น...</p>
+            </div>
+            <div id="genericModalFooter" class="modal-footer"> <button class="modal-button-default"
+                    onclick="closeGenericModal()">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <template id="templateCreateRoomForm">
+        <form id="genericModalCreateRoomForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div style="margin-bottom: 15px;">
+                <label for="modalFormRoomName"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">ชื่อห้อง:</label>
+                <input type="text" id="modalFormRoomName" name="name" placeholder="ชื่อห้อง......" required
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+            <div>
+                <label for="modalFormRoomImage" style="display: block; margin-bottom: 5px; color: #9cc0b2;">รูปภาพห้อง
+                    (ถ้ามี):</label>
+                <input type="file" id="modalFormRoomImage" name="image" accept="image/*"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+        </form>
+    </template>
+
+    <template id="templateEditUserProfileForm">
+        <form id="genericModalEditProfileForm" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div style="margin-bottom: 15px; text-align: center;">
+                <label style="display: block; margin-bottom: 5px; color: #9cc0b2;">รูปโปรไฟล์ปัจจุบัน:</label>
+                <img id="modalEditProfileCurrentImage" src="{{ request.user.get_profile_image_url }}"
+                    alt="Current Profile Image"
+                    style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; border: 1px solid #4f545c;">
+            </div>
+
+            <div>
+                <label for="modalEditProfileNewImage"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">เปลี่ยนรูปโปรไฟล์ใหม่
+                    (ถ้าต้องการ):</label>
+                <input type="file" id="modalEditProfileNewImage" name="profile_image" accept="image/*"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+
+            <div style="margin-bottom: 15px; margin-top: 15px;"> <label for="modalEditProfileDisplayName"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">ชื่อที่แสดง (Display Name):</label>
+                <input type="text" id="modalEditProfileDisplayName" name="display_name" required
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;"
+                    value="{{ request.user.get_name_to_display }}">
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #4f545c; text-align: center;">
+                <button type="button" class="modal-button-secondary" onclick="displayChangeUsernamePasswordPopup()">
+                    เปลี่ยน Username หรือ Password
+                </button>
+            </div>
+            <div id="modalEditProfileErrorMessages" class="form-error-messages"
+                style="display: none; margin-top: 15px;"></div>
+        </form>
+    </template>
+
+    <template id="templateChangeUsernamePasswordForm">
+        <form id="genericModalChangeUsernamePasswordForm">
+            {% csrf_token %} <p style="font-size: 0.9em; color: #b9bbbe; margin-bottom: 15px;">
+                การเปลี่ยน Username หรือ Password จะมีผลต่อการ Login ครั้งต่อไปของคุณ
+            </p>
+            <div style="margin-bottom: 15px;">
+                <label for="modalChangeUsername" style="display: block; margin-bottom: 5px; color: #9cc0b2;">Username
+                    ใหม่ (ถ้าต้องการเปลี่ยน):</label>
+                <input type="text" id="modalChangeUsername" name="new_username"
+                    placeholder="Username ปัจจุบัน: {{ request.user.username }}"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+                <small style="display: block; margin-top: 5px; color: #7f8387;">(ถ้าไม่ต้องการเปลี่ยน Username
+                    ให้เว้นว่างไว)</small>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="modalChangeCurrentPassword"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">Password ปัจจุบัน
+                    (สำหรับยืนยัน):</label>
+                <input type="password" id="modalChangeCurrentPassword" name="current_password" required
+                    placeholder="ใส่ Password ปัจจุบันของคุณ"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="modalChangeNewPassword1"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">Password ใหม่
+                    (ถ้าต้องการเปลี่ยน):</label>
+                <input type="password" id="modalChangeNewPassword1" name="new_password1"
+                    placeholder="Password ใหม่อย่างน้อย 8 ตัวอักษร"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="modalChangeNewPassword2" style="display: block; margin-bottom: 5px; color: #9cc0b2;">ยืนยัน
+                    Password ใหม่:</label>
+                <input type="password" id="modalChangeNewPassword2" name="new_password2"
+                    placeholder="ยืนยัน Password ใหม่อีกครั้ง"
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+            <div id="modalChangeUsernamePasswordErrorMessages" class="form-error-messages"
+                style="display: none; margin-top:15px;"></div>
+        </form>
+    </template>
+
+    <script src="{% static 'voice_chat/js/script_0112.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_123.js' %}"></script>
+    <script src="{% static 'voice_chat/js/popup1234.js' %}"></script>
+    <script>
+        function logout() {
+            window.location.href = "{% url 'logout' %}";
+        }
+    </script>
+
+</body>
+
+</html>

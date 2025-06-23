@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ room.name }}</title>
+    <style>
+        .user-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            transition: border 0.3s ease;
+        }
+
+        .user-speaking {
+            border: 4px solid #00ff00;
+            /* วงกลมเขียวเมื่อพูด */
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🎧 {{ room.name }}</h2>
+    <p><a href="{% url 'home' %}" id="back-to-home">ออกจากห้อง👈</a></p>
+
+    <h3>Users in this room</h3>
+    <ul id="user-list">
+        {% for participant in participants %}
+        <li class="user-container" id="user-{{ participant.user.id }}">
+            <img src="{{ participant.user.profile_picture.url }}" class="user-avatar"
+                id="avatar-{{ participant.user.id }}">
+            {{ participant.user.username }}
+        </li>
+        {% empty %}
+        <li id="no-users">No users in this room</li>
+        {% endfor %}
+    </ul>
+</body>
+
+<script>
+    const roomId = "{{ room.id }}";
+    let peerConnection;
+    const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    
+    const ws = new WebSocket(`ws://localhost:8000/ws/voice/${roomId}/`);
+    
+    ws.onopen = () => {
+        startCall();
+    };
+    
+    ws.onmessage = async (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === "user_list") {
+            updateUserList(data.users);
+        } else if (data.type === "webrtc_offer") {
+            await handleOffer(data.offer);
+        } else if (data.type === "webrtc_answer") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (data.type === "webrtc_candidate") {
+            if (peerConnection.remoteDescription) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+    };
+
+    function updateUserList(users) {
+        const userList = document.getElementById("user-list");
+        userList.innerHTML = "";
+        users.forEach(user => addUserToList(user));
+    }
+
+    function addUserToList(user) {
+        const userList = document.getElementById("user-list");
+        const li = document.createElement("li");
+        li.className = "user-container";
+        li.id = `user-${user.id}`;
+        
+        const img = document.createElement("img");
+        img.src = user.profile_picture;
+        img.className = "user-avatar";
+        img.id = `avatar-${user.id}`;
+        
+        li.appendChild(img);
+        li.innerHTML += ` ${user.username}`;
+        userList.appendChild(li);
+    }
+
+    async function handleOffer(offer) {
+        peerConnection = new RTCPeerConnection(configuration);
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "webrtc_candidate", candidate: event.candidate }));
+            }
+        };
+        
+        peerConnection.ontrack = (event) => {
+            const audio = document.createElement("audio");
+            audio.srcObject = event.streams[0];
+            audio.autoplay = true;
+            document.body.appendChild(audio);
+        };
+        
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "webrtc_answer", answer }));
+        }
+    }
+
+    async function startCall() {
+        peerConnection = new RTCPeerConnection(configuration);
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "webrtc_candidate", candidate: event.candidate }));
+            }
+        };
+        
+        peerConnection.ontrack = (event) => {
+            const audio = document.createElement("audio");
+            audio.srcObject = event.streams[0];
+            audio.autoplay = true;
+            document.body.appendChild(audio);
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+        
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "webrtc_offer", offer }));
+        }
+    }
+</script>
+
+</html>

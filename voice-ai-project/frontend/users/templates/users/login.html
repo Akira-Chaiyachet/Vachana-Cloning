@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    {% load static %}
+    <title>Login</title>
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_login1.css' %}">
+</head>
+
+<body>
+    <div class="content">
+        <h1 style="font-size: 180%; font-weight: 600;">Vachana Cloning</h1>
+        <form method="POST" class="login-form" action="{% url 'login' %}"> {% csrf_token %}
+
+            {% if request.GET.next %}
+                <input type="hidden" name="next" value="{{ request.GET.next }}">
+            {% endif %}
+            <div class="center_l">
+                <div class="copy">
+                    <div class="text-wrapper">เข้าสู่ระบบ</div>
+                </div>
+            </div>
+            <br>
+            <br>
+            <div class="input-and-button">
+                <input class="field" type="text" id="username" name="username"
+                    placeholder="username หรือ email" required>
+                <input type="password" class="field" id="password" name="password" placeholder="รหัสผ่าน"
+                    required>
+            </div>
+            <br>
+            <br>
+            <br>
+            <button type="submit" class="button">
+                <div class="div">เข้าสู่ระบบ</div>
+            </button>
+        </form>
+        <div class="divider">
+            <div class="rectangle"></div>
+            <div class="text-wrapper-2">หรือ <a style="color: aquamarine;" href="{% url 'register' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">ลงทะเบียน</a> หากคุณยังไม่มีบัญชี</div>
+            <div class="rectangle"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const nextUrl = urlParams.get('next');
+
+            if (nextUrl && nextUrl.includes('/join-room/')) {
+                // ตัวอย่างการดึง invite_code จาก nextUrl เช่น '/join-room/YOUR_CODE/'
+                const pathParts = nextUrl.split('/'); // จะได้ array เช่น ["", "join-room", "YOUR_CODE", ""]
+                let inviteCode = null;
+
+                // หา 'join-room' แล้วเอาค่าถัดไป
+                for (let i = 0; i < pathParts.length; i++) {
+                    if (pathParts[i] === 'join-room' && pathParts[i + 1]) {
+                        inviteCode = pathParts[i + 1];
+                        break;
+                    }
+                }
+
+                if (inviteCode) {
+                    console.log('Login Page: Storing invite_code from "next" URL to sessionStorage:', inviteCode);
+                    try {
+                        sessionStorage.setItem('pending_invite_code_after_auth', inviteCode);
+                    } catch (e) {
+                        console.error('Error saving to sessionStorage:', e);
+                        // อาจจะแจ้งเตือนผู้ใช้ถ้า sessionStorage เต็มหรือไม่สามารถใช้งานได้
+                    }
+                }
+            }
+        });
+    </script>
+    </body>
+</html>

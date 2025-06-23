@@ -1,0 +1,245 @@
+/* Modal Overlay (พื้นหลังมัว) */
+.modal-overlay {
+    display: none; /* เริ่มต้นซ่อนไว้ */
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* สีดำโปร่งแสง */
+    z-index: 10000; /* ให้อยู่หน้าสุดมากๆ */
+    display: flex; /* ใช้ flex เพื่อจัดให้อยู่กลางจอ (เมื่อ JS สั่งให้แสดง) */
+    justify-content: center;
+    align-items: center;
+    padding: 20px; /* เพื่อไม่ให้ popup ชิดขอบจอในจอเล็ก */
+    box-sizing: border-box;
+}
+
+/* กล่องเนื้อหา Modal หลัก */
+.modal-content-box {
+    background-color: #36393f; /* สีพื้นหลัง popup */
+    color: #dcddde; /* สีตัวอักษร */
+    padding: 0; /* เราจะใช้ padding ใน header, body, footer แทน */
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    width: 450px; /* ปรับความกว้างตามต้องการ */
+    max-width: 100%;
+    position: relative;
+    animation: modalOpenAnimation 0.3s ease-out;
+    overflow: hidden; /* ป้องกันไม่ให้ border-radius ของ header/footer เพี้ยน */
+}
+
+@keyframes modalOpenAnimation {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #40444b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#genericModalTitle {
+    margin: 0;
+    font-size: 1.4em;
+    color: #9dbbb2;
+    font-weight: 500;
+}
+
+.modal-close-btn {
+    font-size: 28px;
+    font-weight: bold;
+    color: #9cc0b2;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 5px;
+    line-height: 1;
+}
+.modal-close-btn:hover {
+    color: #f77070;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh; /* จำกัดความสูงของ body ให้ scroll ได้ถ้าเนื้อหายาว */
+    overflow-y: auto;
+}
+
+.modal-body p {
+    margin-top: 0;
+    line-height: 1.6;
+}
+
+/* ตัวอย่างสำหรับ form ภายใน modal body */
+.modal-body form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #b9bbbe;
+}
+.modal-body form input[type="text"],
+.modal-body form input[type="file"],
+.modal-body form textarea {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 1px solid #2b2d31;
+    background-color: #2b2d31;
+    color: #dcddde;
+    box-sizing: border-box;
+}
+.modal-body form input[type="text"]:focus,
+.modal-body form textarea:focus {
+    outline: none;
+    border-color: #5865f2; /* Discord purple/blue */
+}
+
+
+.modal-footer {
+    padding: 15px 20px;
+    background-color: #313338; /* สีเข้มกว่า body เล็กน้อย */
+    border-top: 1px solid #40444b;
+    text-align: right; /* จัดปุ่มไปทางขวา */
+    display: flex;
+    justify-content: flex-end; /* จัดปุ่มไปทางขวา */
+    gap: 10px; /* ระยะห่างระหว่างปุ่ม */
+}
+
+/* สไตล์ปุ่มพื้นฐานใน Footer */
+.modal-footer button {
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+
+.modal-button-primary {
+    background-color: #729889; /* Discord purple/blue */
+    color: #c2ffe6;
+}
+.modal-button-primary:hover {
+    background-color: #384b44;
+}
+
+.modal-button-default {
+    background-color: #4f545c;
+    color: #c2ffe6;
+}
+.modal-button-default:hover {
+    background-color: #f77070;
+}
+
+.modal-button-danger {
+    background-color: #da373c; /* Discord red */
+    color: white;
+}
+.modal-button-danger:hover {
+    background-color: #a8292e;
+}
+
+
+/* สไตล์ร่วมสำหรับ Popup Menu ทั้งหมด */
+.popup-menu {
+    display: none; /* เริ่มต้นซ่อนไว้ */
+    position: absolute; /* การจัดตำแหน่งจะขึ้นอยู่กับ JS หรือ CSS เฉพาะ */
+    background-color: #333639;
+    border: 1px solid #9dbbb2; /* ปรับสีเส้นขอบให้เข้มขึ้นเล็กน้อย */
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+    z-index: 9999;
+    color: #9dbbb2;
+    min-width: 200px; /* ความกว้างต่ำสุด */
+}
+
+.popup-menu ul {
+    list-style: none;
+    padding: 5px 0; /* เพิ่ม padding แนวตั้งให้ ul เล็กน้อย */
+    margin: 0;
+}
+
+.popup-menu li {
+    padding: 10px 18px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    /* border-bottom: 1px solid #4a4e53; /* เอาเส้นคั่นออก ให้ดู clean ขึ้น หรือใช้ :not(:last-child) */
+    transition: background-color 0.15s ease-in-out;
+}
+.popup-menu li:not(:last-child) { /* เพิ่มเส้นคั่นให้ทุก li ยกเว้นอันสุดท้าย */
+     border-bottom: 1px solid #4a4e53;
+}
+
+
+.popup-menu li:hover {
+    background-color: #4a4e53;
+    color: #9dbbb2;
+}
+
+/* --- สไตล์เฉพาะสำหรับการจัดตำแหน่งของแต่ละเมนู --- */
+
+/* .room-title และ .current-user-display ควรจะมี position: relative เพื่อให้เมนูอ้างอิงได้ */
+.room-title, .current-user-display {
+    position: relative;
+    cursor: pointer; /* เพิ่ม cursor pointer ให้ trigger */
+}
+
+/* เมนูตั้งค่าห้อง (settingsMenu) - แสดงใต้ .room-title-menu-area หรือ .room-title */
+.room-settings-specific-styles { /* ใช้กับ #settingsMenu */
+    top: calc(100% + 2px); /* ตำแหน่งใต้ trigger */
+    right: 0; /* หรือ left: 0; ขึ้นอยู่กับการออกแบบ */
+    /* อาจจะต้องปรับ margin-top หรือ bottom เพิ่มเติมตามความสูงของ .room-title */
+}
+
+/* เมนูตัวเลือกผู้ใช้ (currentUserMenu) - แสดงเหนือ .current-user-display */
+.user-menu-specific-styles { /* ใช้กับ #currentUserMenu */
+    bottom: calc(100% + 5px); /* ตำแหน่งเหนือ trigger */
+    right: 0;
+    border-bottom: 1px solid #707377; /* คืนเส้นขอบล่าง */
+    border-top: 1px solid #707377; /* เพิ่มเส้นขอบบน (ถ้าเมนูเปิดขึ้น) */
+    border-radius: 6px 6px 0 0; /* ถ้าเปิดขึ้นบน มุมบนโค้งมน */
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+}
+
+/* ไอคอนแสดงสถานะเมนู (ถ้ามี) */
+.menu-anchor-point { /* ตัวครอบไอคอนและเมนู */
+    position: relative; /* <<<< สำคัญมาก! เพื่อให้ #settingsMenu อ้างอิงตำแหน่งจากตัวนี้ */
+    display: flex;
+    align-items: center;
+    margin-left: auto;  /* <<<< เพิ่มบรรทัดนี้ เพื่อดันไปทางขวาสุด */
+    flex-shrink: 0;    /* ไม่ให้หดตัว */
+}
+
+.menu-indicator-icon {
+    font-size: 14px;
+    color: #9dbbb2;
+    padding: 0 5px;
+    user-select: none;
+}
+
+#settingsMenu {
+    display: none; /* JavaScript ควบคุม */
+    position: absolute;
+    top: 100%; /* แสดงใต้ .menu-anchor-point */
+    right: 0;  /* ชิดขวาของ .menu-anchor-point */
+    margin-top: 2px; /* ระยะห่างเล็กน้อย */
+    width: 220px;
+    background-color: rgb(51, 54, 57);
+    border: 0.1px solid #9dbbb252;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
+    z-index: 1050;
+    color: #9dbbb2;
+}
+
+/* สไตล์ของ ul และ li ภายใน #settingsMenu (เหมือนเดิม) */
+#settingsMenu ul { list-style: none; padding: 5px 0; margin: 0; }
+#settingsMenu li { padding: 10px 18px; cursor: pointer; font-size: 0.9rem; }
+#settingsMenu li:not(:last-child) { border-bottom: 1px solid #4a4e53; }
+#settingsMenu li:hover { background-color: #4a4e53; color: #ffffff; }

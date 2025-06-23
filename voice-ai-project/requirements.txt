@@ -1,0 +1,14 @@
+Django
+daphne
+channels
+channels-redis
+djangorestframework
+Pillow
+mysqlclient
+pydub
+ffmpeg-python
+django-extensions
+websockets
+django-cors-headers
+django-recaptcha
+requests

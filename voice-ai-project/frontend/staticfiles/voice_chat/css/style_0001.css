@@ -1,0 +1,289 @@
+body {
+    display: flex;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #93ada4;
+    background:rgb(60, 64, 68);
+}
+
+.sidebar {
+    width: 1050%; /* เพิ่มให้ container ยืดได้เต็มความกว้าง */
+    max-width: 250px; /* หรือกำหนดขนาดที่ต้องการ */
+    background:rgb(51, 54, 57);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    color: #93ada4;
+}
+
+.icon_VC {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px; /* ปรับระยะห่างระหว่างข้อความกับปุ่ม */
+}
+
+.icon_VC h3 {
+    margin: 0; /* ลบ margin เพื่อให้ชิดกับปุ่ม */
+    cursor: pointer;
+}
+
+.icon_VC button {
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.user-container {
+    padding: 15px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 14%;
+    margin-left: auto; 
+    background-color: #464b50;
+}
+
+.settings-menu {
+    display: none;
+    position: absolute;
+    top: 50px;
+    right: 20px;
+    background:rgb(51, 54, 57);
+    border: 1px solid #93ada4;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    z-index: 100;
+    color: #93ada4;
+}
+
+.settings-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: #93ada4;
+}
+
+.settings-menu li {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #93ada4;
+    color: #93ada4;
+}
+
+.settings-menu li:hover {
+    background: #464646;
+    color: #93ada4;
+}
+
+.user-body {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.user-header {
+    display: flex;
+    align-items: center; /* จัดให้ข้อความและปุ่มอยู่แนวเดียวกัน */
+    flex-wrap: wrap; /* ถ้าข้อความยาว ให้ปุ่มไปอยู่ด้านล่าง */
+    position: relative;
+    gap: 8px; /* ให้ปุ่มห่างจากข้อความนิดหน่อย */
+    max-width: 100%;
+    margin-top: -40px;
+}
+#settingsBtn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    margin-left: 8px; /* ระยะห่างปกติ */
+    position:relative;
+    align-self: center; /* ให้ปุ่มอยู่แนวเดียวกับ h2 */
+}
+
+#roomTitle {
+    max-width: 80%; /* ป้องกันข้อความกินพื้นที่ทั้งหมด */
+    word-wrap: break-word;
+}
+@media (max-width: 600px) {
+    #settingsBtn {
+        position: absolute;
+        bottom: -25px;
+        right: 0;
+    }
+}
+.user-footer {
+    padding: 10px;
+    border-top: 1px solid #ccc;
+    display: flex;
+}
+
+.user-list {
+    list-style: none;
+    padding: 0;
+}
+
+.user-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+}
+
+.user-list img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.room-list {
+    list-style: none;
+    padding: 0;
+}
+
+.room-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+}
+
+.room-list img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+.profile-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
+.container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.search-box {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+input#searchRoom {
+    padding: 10px;
+    width: 80%;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    background: #5f8173;
+    color: #ceffea;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+/* Popup Style */
+.popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #464646;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    width: 300px;
+    text-align: center;
+    padding: 20px;
+}
+
+.popup-content {
+    position: relative;
+}
+
+.popup img {
+    width: 100%;
+    border-radius: 5px;
+}
+
+.popup h3 {
+    margin: 10px 0;
+}
+
+.join-btn {
+    background: green;
+    color: white;
+}
+
+.cancel-btn {
+    background: red;
+    color: white;
+}
+
+.close-btn {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+/* From Uiverse.io by alexruix */ 
+.group_search {
+    display: flex;
+    line-height: 28px;
+    align-items: center;
+    position: relative;
+    max-width: 190px;
+    width: 124%; /* เพิ่มให้ container ยืดได้เต็มความกว้าง */
+    max-width: 400px; /* หรือกำหนดขนาดที่ต้องการ */
+   }
+   
+   .input_search {
+    width: 400%;
+    height: 40px;
+    line-height: 28px;
+    padding: 0 1rem;
+    padding-left: 2.5rem;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    outline: none;
+    background-color: #464646;
+    color: #93ada4;
+    transition: .3s ease;
+    text-indent: 30px;
+   }
+   
+   .input_search::placeholder {
+    color: #93ada4;
+    text-indent: 30px;
+   }
+   
+   .input_search:focus, input:hover {
+    outline: none;
+    border-color: rgb(0, 255, 64);
+    background-color: #464646;
+    box-shadow: 0 0 0 4px rgba(89, 234, 76, 0.1);
+   }
+   
+   .icon_search {
+    position: absolute;
+    left: 1rem;
+    fill: #93ada4;
+    width: 1rem;
+    height: 1rem;
+   }
+   
+
+   

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    {% load static %}
+    <title>Register</title>
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_re1.css' %}">
+</head>
+
+<body>
+    <div class="content">
+        <h1 style="font-size: 180%; font-weight: 600;">Vachana Cloning</h1>
+        <form form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="center_l">
+                <div class="copy">
+                    <div class="text-wrapper">ลงทะเบียน</div>
+                </div>
+            </div>
+            <br>
+            <br>
+            <div class="input-and-button">
+                <input for="username" class="field" type="text" id="username" name="username" placeholder="username"
+                    required>
+                <input for="password1" class="field" type="password" id="password1" name="password1"
+                    placeholder="รหัสผ่าน(ใส่ตัวอักษรพิเศษและตัวเลข)" required>
+                <input for="password2" class="field" type="password" id="password2" name="password2"
+                    placeholder="ยืนยันรหัสผ่าน(ใส่ตัวอักษรพิเศษและตัวเลข)" required>
+                <input for="profile_image" class="field" type="file" id="profile_image" name="profile_image"
+                    accept="image/*">
+            </div>
+            <br>
+            <br>
+            <br>
+            <button type="submit" class="button">
+                <div class="div">ลงทะเบียน</div>
+            </button>
+        </form>
+        <div class="divider">
+            <div class="rectangle"></div>
+            <div class="text-wrapper-2">หรือ <a style="color: aquamarine;"
+                    href="{% url 'login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">เข้าสู่ระบบ</a>
+                หากคุณมีบัญชีอยู่แล้ว</div>
+            <div class="rectangle"></div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const nextUrl = urlParams.get('next'); // ดึง 'next' จาก URL ของหน้า register เอง
+
+            if (nextUrl && nextUrl.includes('/join-room/')) {
+                const pathParts = nextUrl.split('/');
+                let inviteCode = null;
+                for (let i = 0; i < pathParts.length; i++) {
+                    if (pathParts[i] === 'join-room' && pathParts[i + 1]) {
+                        inviteCode = pathParts[i + 1];
+                        break;
+                    }
+                }
+
+                if (inviteCode) {
+                    console.log('Register Page: Storing/Re-affirming invite_code from "next" URL to sessionStorage:', inviteCode);
+                    try {
+                        sessionStorage.setItem('pending_invite_code_after_auth', inviteCode);
+                    } catch (e) {
+                        console.error('Error saving to sessionStorage on register page:', e);
+                    }
+                }
+            } else {
+                // ถ้า nextUrl ไม่ได้ถูกส่งมากับ URL ของหน้า register
+                // เราจะยังคงหวังว่า sessionStorage จากหน้า login (ถ้าผู้ใช้เคยผ่านหน้านั้นมา) จะยังอยู่
+                // ไม่จำเป็นต้องทำอะไรตรงนี้เป็นพิเศษ เพราะ sessionStorage จะยังคงเดิม
+                console.log('Register Page: No "next" URL parameter with /join-room/ found. Relying on sessionStorage if previously set.');
+            }
+        });
+    </script>
+</body>
+
+</html>

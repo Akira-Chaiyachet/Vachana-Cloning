@@ -1,1 +1,56 @@
- 
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "until mysqladmin ping -h db --silent; do sleep 5; done &&
+            #  python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    working_dir: /app/frontend
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy  # ✅ ให้ Django รอจนกว่า MySQL จะพร้อม
+      redis:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  db:
+    image: mysql:8.0
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: voice_ai
+      MYSQL_USER: django_user
+      MYSQL_PASSWORD: VC@V-ai2025
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  db_data:
