@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <title>Vachana Cloning</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'voice_chat/css/style_1234.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_3.1.css' %}">
     <link rel="stylesheet" href="{% static 'voice_chat/css/popup2.css' %}">
 </head>
 
@@ -51,7 +51,7 @@
         </div> -->
         <ul id="roomList" class="room-list">
             {% for room in rooms %}
-            <li onclick="loadRoom('{{ room.id }}', '{{ room.name }}', '{{ room.invite_code }}')">
+            <li data-room-id="{{ room.id }}" data-invite-code="{{ room.invite_code }}" onclick="loadRoom('{{ room.id }}', '{{ room.name }}', '{{ room.invite_code }}')">
                 <img src="{{ room.image.url }}" onerror="this.src='/media/default/room.jpg'">
                 <span>{{ room.name }}</span>
             </li>
@@ -78,8 +78,8 @@
                     </div>
                 </div>
             </div>
-            <div class="voie-room-title">
-                <h2 id="roomTitle">ห้องพูดคุย</h2>
+            <div class="voie-room-title"> <!-- This is likely a static title, so removing duplicate ID -->
+                <h2 style="text-align: center; font-weight: normal; margin-top: 13px;">ห้องพูดคุย</h2>
             </div>
         </div>
         <div class="main-body-content-wrapper">
@@ -254,9 +254,9 @@
         </form>
     </template>
 
-    <script src="{% static 'voice_chat/js/script_0345.js' %}"></script>
-    <script src="{% static 'voice_chat/js/script_03.js' %}"></script>
-    <script src="{% static 'voice_chat/js/popup_03.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.2.1.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.3.js' %}"></script>
+    <script src="{% static 'voice_chat/js/popup_03.3.js' %}"></script>
     <script>
         function logout() {
             window.location.href = "{% url 'logout' %}";
