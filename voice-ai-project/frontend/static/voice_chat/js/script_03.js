@@ -198,6 +198,32 @@ function loadRooms() {
 
 }
 
+function updateRoomInSidebar(roomId, newName, newImageUrl) {
+    const roomListItem = document.querySelector(`li[data-room-id="${roomId}"]`);
+    if (roomListItem) {
+        const roomNameSpan = roomListItem.querySelector('span');
+        const roomImageImg = roomListItem.querySelector('img');
+
+        if (roomNameSpan) {
+            roomNameSpan.textContent = newName;
+        }
+        if (roomImageImg && newImageUrl) {
+            // เพิ่ม timestamp เพื่อป้องกัน cache ของ browser
+            roomImageImg.src = newImageUrl + "?t=" + new Date().getTime();
+        }
+        // อัปเดต roomTitle ใน main-content-area ด้วย หากห้องนั้นเป็นห้องปัจจุบันที่กำลังแสดงอยู่
+        const roomTitleElement = document.getElementById("roomTitle");
+        if (roomTitleElement && localStorage.getItem("currentRoomId") === String(roomId)) { // currentRoomId จาก localStorage เป็น string
+            roomTitleElement.textContent = newName;
+        }
+    } else {
+        console.warn(`ไม่พบห้อง ID ${roomId} ใน sidebar เพื่ออัปเดต UI`);
+        // หากไม่พบ อาจจะต้องพิจารณาเรียก loadRooms() ใหม่ทั้งหมด
+        // if (typeof loadRooms === "function") {
+        //     loadRooms();
+        // }
+    }
+}
 
 function loadRoom(roomId, roomName, inviteCode) {
     if (!roomId) {

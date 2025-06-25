@@ -737,3 +737,154 @@ function processActualUsernamePasswordChange() {
         }, 100); // หน่วงเวลาเพื่อให้ displayChangeUsernamePasswordPopup() แสดง modal เสร็จก่อน
     });
 }
+
+// ฟังก์ชันสำหรับเปิด Modal แก้ไขโปรไฟล์ห้อง
+function displayEditRoomProfileModal() {
+    // ปิดเมนูตั้งค่าห้องก่อนเปิด Modal
+    const settingsMenu = document.getElementById("settingsMenu");
+    if (settingsMenu && settingsMenu.style.display === "block") {
+        settingsMenu.style.display = "none";
+        // รีเซ็ตไอคอนของปุ่ม Trigger ถ้ามี
+        const trigger = document.querySelector('[data-menu-trigger-for="settingsMenu"]');
+        if (trigger && typeof resetMenuIcon === "function") {
+            resetMenuIcon(trigger);
+        }
+    }
+
+    const formTemplate = document.getElementById("templateEditRoomProfileForm");
+    if (!formTemplate) {
+        console.error("ไม่พบ Template: templateEditRoomProfileForm");
+        alert("เกิดข้อผิดพลาด: ไม่พบ UI สำหรับแก้ไขโปรไฟล์ห้อง");
+        return;
+    }
+    const formHtml = formTemplate.innerHTML;
+
+    // ดึงข้อมูลห้องปัจจุบันจาก localStorage
+    const currentRoomId = localStorage.getItem("currentRoomId");
+    const currentRoomName = localStorage.getItem("currentRoomName");
+    
+    // พยายามดึงรูปภาพห้องจากรายการห้องใน sidebar
+    let currentRoomImage = "/media/default/room.jpg"; // รูปภาพเริ่มต้น
+    const currentRoomListItem = document.querySelector(`li[data-room-id="${currentRoomId}"]`);
+    if (currentRoomListItem) {
+        const imgElement = currentRoomListItem.querySelector('img');
+        if (imgElement) {
+            currentRoomImage = imgElement.src;
+        }
+    }
+
+    if (!currentRoomId) {
+        alert("กรุณาเลือกห้องที่ต้องการแก้ไขก่อน");
+        return;
+    }
+
+    openGenericModal({
+        title: `แก้ไขโปรไฟล์ห้อง: ${escapeHTML(currentRoomName)}`,
+        bodyHTML: formHtml,
+        footerHTML: `
+            <button class="modal-button-default" onclick="closeGenericModal()">ยกเลิก</button>
+            <button class="modal-button-primary" onclick="submitEditRoomProfileForm()">บันทึกการเปลี่ยนแปลง</button>
+        `,
+    });
+
+    // กำหนดค่าเริ่มต้นให้กับฟอร์มหลังจาก Modal เปิด
+    setTimeout(() => {
+        const roomNameInput = document.getElementById("modalEditRoomName");
+        const roomCurrentImageElem = document.getElementById("modalEditRoomCurrentImage");
+
+        if (roomNameInput) {
+            roomNameInput.value = currentRoomName || "";
+        }
+        if (roomCurrentImageElem) {
+            roomCurrentImageElem.src = currentRoomImage;
+        }
+    }, 0); // ใช้ setTimeout เพื่อให้แน่ใจว่า DOM elements ถูก render แล้ว
+}
+
+// ฟังก์ชันสำหรับส่งข้อมูลฟอร์มแก้ไขโปรไฟล์ห้อง
+function submitEditRoomProfileForm() {
+    const form = document.getElementById("genericModalEditRoomProfileForm");
+    const errorMessagesDiv = document.getElementById("modalEditRoomErrorMessages");
+
+    if (!form) {
+        console.error("ไม่พบฟอร์ม genericModalEditRoomProfileForm ใน Popup!");
+        alert("เกิดข้อผิดพลาด: ไม่พบข้อมูลฟอร์มสำหรับแก้ไขโปรไฟล์ห้อง");
+        return;
+    }
+
+    // เคลียร์ error เก่า (ถ้ามี)
+    if (errorMessagesDiv) {
+        errorMessagesDiv.innerHTML = "";
+        errorMessagesDiv.style.display = "none";
+    }
+
+    const currentRoomId = localStorage.getItem("currentRoomId");
+    if (!currentRoomId) {
+        alert("ไม่พบ ID ห้องปัจจุบัน กรุณาลองใหม่อีกครั้ง");
+        closeGenericModal();
+        return;
+    }
+
+    let formData = new FormData(form);
+    // เพิ่ม room_id เข้าไปใน formData เพื่อส่งไปยัง backend
+    formData.append('room_id', currentRoomId);
+
+    fetch(`/rooms/api/update-room-profile/${currentRoomId}/`, { // API endpoint สำหรับอัปเดตโปรไฟล์ห้อง
+        method: "POST", // หรือ PUT/PATCH ตามการออกแบบ API ของคุณ
+        body: formData,
+        headers: { "X-CSRFToken": getCSRFToken() },
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                const errorToThrow = new Error(
+                    errData.detail || errData.error || `เกิดข้อผิดพลาด HTTP ${response.status}`
+                );
+                errorToThrow.responsePayload = errData.error; // เก็บ raw error object
+                throw errorToThrow;
+            }).catch(() => {
+                throw new Error(`เกิดข้อผิดพลาด HTTP ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            if (errorMessagesDiv) {
+                if (typeof data.error === "object" && data.error !== null) {
+                    let errorHtml = "<ul>";
+                    for (const field in data.error) {
+                        if (Array.isArray(data.error[field])) {
+                            data.error[field].forEach(msg => {
+                                errorHtml += `<li>${field === '__all__' ? '' : (escapeHTML(field) + ': ')}${escapeHTML(msg)}</li>`;
+                            });
+                        } else {
+                            errorHtml += `<li>${field === '__all__' ? '' : (escapeHTML(field) + ': ')}${escapeHTML(data.error[field])}</li>`;
+                        }
+                    }
+                    errorHtml += "</ul>";
+                    errorMessagesDiv.innerHTML = errorHtml;
+                } else {
+                    errorMessagesDiv.textContent = escapeHTML(data.error.toString());
+                }
+                errorMessagesDiv.style.display = "block";
+            } else {
+                alert("ผิดพลาด: " + (typeof data.error === "string" ? data.error : JSON.stringify(data.error)));
+            }
+        } else {
+            alert(data.message || "อัปเดตโปรไฟล์ห้องสำเร็จ!");
+            closeGenericModal();
+
+            // อัปเดต UI ใน sidebar ทันที
+            if (data.room_id && data.room_name) {
+                updateRoomInSidebar(data.room_id, data.room_name, data.image_url);
+                localStorage.setItem("currentRoomName", data.room_name); // อัปเดต localStorage ด้วย
+            }
+        }
+    })
+    .catch(error => {
+        console.error("เกิดข้อผิดพลาดขณะอัปเดตโปรไฟล์ห้อง:", error);
+        const displayError = error.responsePayload ? JSON.stringify(error.responsePayload) : (error.message || "เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่");
+        alert(displayError);
+    });
+}

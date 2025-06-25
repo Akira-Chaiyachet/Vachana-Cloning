@@ -34,6 +34,64 @@ function connectWebSocket(roomId) {
     };
 }
 
+function connectLobbySocket() {
+    console.log("🔌 Attempting to connect to the Lobby WebSocket...");
+    
+    const lobbyProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const lobbyUrl = `${lobbyProtocol}${window.location.host}/ws/lobby/`;
+    const lobbySocket = new WebSocket(lobbyUrl);
+
+    lobbySocket.onopen = function() {
+        console.log("✅ Lobby WebSocket connection established.");
+    };
+
+    lobbySocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log("🛎️ Received a notification from Lobby:", data);
+
+        // ตรวจสอบชนิดของข้อความที่ได้รับ
+        if (data.type === 'room_updated' && data.room) {
+            const room = data.room;
+            console.log(`🔄 Updating room in sidebar: ID=${room.id}, Name=${room.name}`);
+            
+            // ค้นหารายการห้องใน Sidebar ด้วย ID
+            const roomListItem = document.querySelector(`#roomList li[onclick*="loadRoom('${room.id}'"]`);
+
+            if (roomListItem) {
+                // อัปเดตชื่อ
+                const roomNameSpan = roomListItem.querySelector('span');
+                if (roomNameSpan) {
+                    roomNameSpan.textContent = room.name;
+                }
+                
+                // อัปเดตรูปภาพ
+                const roomImageElem = roomListItem.querySelector('img');
+                if (roomImageElem) {
+                    roomImageElem.src = room.image_url;
+                }
+                
+                // อัปเดต onclick attribute เพื่อให้ชื่อใหม่ถูกส่งไปเมื่อคลิก
+                // นี่เป็นวิธีที่ง่ายที่สุดโดยไม่ต้องสร้าง element ใหม่ทั้งหมด
+                const oldOnclick = roomListItem.getAttribute('onclick');
+                const oldInviteCode = oldOnclick.split(',')[2].replace(/['")]/g, '').trim();
+                roomListItem.setAttribute('onclick', `loadRoom('${room.id}', '${room.name}', '${oldInviteCode}')`);
+
+            } else {
+                console.warn(`Could not find room with ID ${room.id} in the sidebar to update.`);
+            }
+        }
+    };
+
+    lobbySocket.onclose = function(event) {
+        console.warn("❌ Lobby WebSocket connection closed. Reconnecting in 5 seconds...");
+        setTimeout(connectLobbySocket, 5000); // พยายามเชื่อมต่อใหม่
+    };
+
+    lobbySocket.onerror = function(error) {
+        console.error("⚠️ Lobby WebSocket error:", error);
+    };
+}
+
 function loadRoomMembers() {
     let roomId = localStorage.getItem("currentRoomId");
     if (!roomId) {

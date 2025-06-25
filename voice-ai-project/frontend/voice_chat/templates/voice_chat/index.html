@@ -65,9 +65,11 @@
                 <div class="menu-anchor-point">
                     <span id="munublock" class="menu-indicator-icon" style="display: none;">▽</span>
 
+                    <!-- Room Settings Menu -->
                     <div id="settingsMenu" class="popup-menu room-settings-specific-styles">
                         <ul>
                             <li>ตั้งค่าห้อง</li>
+                            <li onclick="displayEditRoomProfileModal()">⚙️ แก้ไขโปรไฟล์ห้อง</li>
                             <li onclick="copyInviteLink()">🔗 คัดลอกลิงก์</li>
                             <li id="copyRoomCodeBtn" onclick="copyRoomCode()" style="display: none;">📄 คัดลอกรหัสห้อง
                             </li>
@@ -150,6 +152,30 @@
         </form>
     </template>
 
+    <template id="templateEditRoomProfileForm">
+        <form id="genericModalEditRoomProfileForm" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div style="margin-bottom: 15px; text-align: center;">
+                <label style="display: block; margin-bottom: 5px; color: #9cc0b2;">รูปห้องปัจจุบัน:</label>
+                <img id="modalEditRoomCurrentImage" src="" alt="Current Room Image" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; border: 1px solid #4f545c;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="modalEditRoomName"
+                    style="display: block; margin-bottom: 5px; color: #9cc0b2;">ชื่อห้อง:</label>
+                <input type="text" id="modalEditRoomName" name="name" required
+                    style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+
+            <div>
+                <label for="modalEditRoomNewImage" style="display: block; margin-bottom: 5px; color: #9cc0b2;">เปลี่ยนรูปห้องใหม่ (ถ้าต้องการ):</label>
+                <input type="file" id="modalEditRoomNewImage" name="image" accept="image/*" style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #2b2d31; background-color: #2b2d31; color: #dcddde;">
+            </div>
+            <div id="modalEditRoomErrorMessages" class="form-error-messages" style="display: none; margin-top: 15px;"></div>
+        </form>
+    </template>
+
     <template id="templateEditUserProfileForm">
         <form id="genericModalEditProfileForm" enctype="multipart/form-data">
             {% csrf_token %}
@@ -228,9 +254,9 @@
         </form>
     </template>
 
-    <script src="{% static 'voice_chat/js/script_0112.js' %}"></script>
-    <script src="{% static 'voice_chat/js/script_123.js' %}"></script>
-    <script src="{% static 'voice_chat/js/popup1234.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_0345.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.js' %}"></script>
+    <script src="{% static 'voice_chat/js/popup_03.js' %}"></script>
     <script>
         function logout() {
             window.location.href = "{% url 'logout' %}";

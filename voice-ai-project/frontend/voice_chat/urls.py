@@ -16,4 +16,6 @@ urlpatterns = [
     path("leave-room/<int:room_id>/", views.leave_room, name="leave_room"),
     path("api/search-room/<str:invite_code>/", views.search_room, name="search-room"),
     path("api/get-room-link/<str:invite_code>/", views.get_room_link, name="get_room_link"),
+    path('rooms/api/update-room-profile/<int:room_id>/', views.update_room_profile, name='update_room_profile'),
+    path('rooms/api/room-details/<int:room_id>/', views.get_room_details, name='get_room_details'),
 ]
