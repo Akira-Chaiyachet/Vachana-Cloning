@@ -40,10 +40,3 @@ django_user
 docker-compose down --volumes --remove-orphans
 docker-compose up --build
 
-
-
-Site Key
-6Lc7PVsrAAAAALeM87qko1_0zlix8py_IYrQA85y
-
-Secret Key
-6Lc7PVsrAAAAAA4SJagLsp5hZay5A5XMgMKIZYYY
