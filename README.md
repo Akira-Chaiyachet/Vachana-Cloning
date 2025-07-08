@@ -55,37 +55,6 @@ The platform's architecture is composed of four primary modules working in tande
 5.  ข้อความที่แปลแล้วจะถูกสังเคราะห์เป็นเสียงโคลนนิ่งด้วย **TTS**
 6.  เสียงที่ได้จะถูกส่งไปยัง **ผู้ใช้ B**
 
----
-
-## การติดตั้งและใช้งาน / Getting Started
-
-ทำตามขั้นตอนง่ายๆ ด้านล่างนี้เพื่อติดตั้งโปรเจกต์และรันบนเครื่องของคุณ
-
-To get a local copy up and running, follow these simple steps.
-
-### สิ่งที่ต้องมี / Prerequisites
-
-* Docker
-* Git
-
-### การติดตั้ง / Installation
-
-1.  คัดลอกโปรเจกต์ (Clone the repo)
-    ```sh
-    git clone [https://github.com/Akira-Chaiyachet/Vachana-Cloning.git](https://github.com/Akira-Chaiyachet/Vachana-Cloning.git)
-    ```
-2.  เข้าไปยังโฟลเดอร์ของโปรเจกต์ (Navigate to the project directory)
-    ```sh
-    cd Vachana-Cloning
-    ```
-3.  สร้างและรัน Docker containers (Build and run the Docker containers)
-    ```sh
-    docker-compose up --build
-    ```
-4.  เปิดเบราว์เซอร์และไปที่ `http://localhost:8000` (Open your browser and navigate to `http://localhost:8000`)
-
----
-
 ## ผู้จัดทำ / Contributors
 
 โปรเจกต์นี้พัฒนาโดย:
