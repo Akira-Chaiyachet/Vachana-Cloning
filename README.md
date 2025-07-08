@@ -1,5 +1,5 @@
-# Vachana-Cloning: แพลตฟอร์มแปลภาษาและโคลนนิ่งเสียงด้วย AI แบบเรียลไทม์
-# Vachana-Cloning: Real-Time Translation and AI Voice Cloning Platform
+# Vachana-Cloning: แพลตฟอร์มแปลภาษาและโคลนนิ่งเสียงด้วย AI แบบเรียลไทม์ (อยู่ระหว่างการพัฒนา)
+# Vachana-Cloning: Real-Time Translation and AI Voice Cloning Platform (Under Development)
 
 Vachana-Cloning คือแพลตฟอร์มสื่อสารแบบเรียลไทม์ที่ใช้ประโยชน์จากเทคโนโลยีปัญญาประดิษฐ์ (AI) เพื่อทำลายกำแพงด้านภาษา โปรเจกต์นี้ได้ผสานเทคโนโลยีการแปลงเสียงเป็นข้อความ (Speech-to-Text - STT), การแปลภาษา (Machine Translation - MT), และการแปลงข้อความเป็นเสียงพูด (Text-to-Speech - TTS) เข้ากับความสามารถในการโคลนเสียง เพื่อมอบประสบการณ์การสนทนาข้ามภาษาที่ราบรื่นและเป็นธรรมชาติ
 
@@ -47,7 +47,6 @@ The platform's architecture is composed of four primary modules working in tande
 4.  **Backend API & Real-Time Communication**: จัดการการส่งข้อมูลและการสื่อสารแบบเรียลไทม์ระหว่างผู้ใช้ผ่าน WebRTC และ WebSocket
 
 **ขั้นตอนการทำงาน / How It Works**
-![Flowchart](https://i.imgur.com/vHblY2k.png)
 
 1.  **ผู้ใช้ A (User A)** พูดภาษาของตนเอง
 2.  เสียงจะถูกส่งไปยังเซิร์ฟเวอร์
