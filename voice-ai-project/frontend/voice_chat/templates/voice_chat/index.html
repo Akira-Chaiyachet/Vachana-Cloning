@@ -1,19 +1,21 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Vachana Cloning</title>
+    <title translate="no">Vachana Cloning</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'voice_chat/css/style_3.1.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_3.14.css' %}">
     <link rel="stylesheet" href="{% static 'voice_chat/css/popup2.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/chat_rom_03.5.css' %}">
 </head>
 
-<body>
-    <div class="sidebar">
+<body data-current-user-id="{{ request.user.id }}">
+    <div id="app-container">
+        <div class="sidebar">
         <div class="icon_VC">
-            <h3 id="leaveBtn" onclick="disconnectRoom()">Vachana Cloning</h3>
-            &nbsp;
+            <h3 id="leaveBtn" onclick="disconnectRoom()"><span class="sidebar-title-full" translate="no">Vachana Cloning</span><span class="sidebar-title-short" translate="no">VC</span></h3>
             <button onclick="displayCreateRoomPopup()">สร้างห้อง</button>
         </div>
         <div id="createRoomModal" class="modal" style="display: none;">
@@ -28,7 +30,7 @@
         </div>
         <br>
         <div class="group_search">
-            <svg class="icon_search" aria-hidden="true" viewBox="0 0 24 24" onclick="searchRoom()">
+            <svg class="icon_search" aria-hidden="true" viewBox="0 0 24 24" onclick="handleSearchIconClick()">
                 <g>
                     <path
                         d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z">
@@ -39,26 +41,16 @@
                 onkeydown="handleSearch(event)">
         </div>
         <br>
-
-        <!-- Popup ยืนยันเข้าร่วมห้อง -->
-        <!-- <div id="roomPopup" class="popup" data-invite="{{ invite_code }}" style="display: none;">
-            <div class="popup-content">
-                <img id="popupRoomImage" src="/media/default/room.jpg" alt="รูปห้อง">
-                <h3 id="popupRoomName">ชื่อห้อง</h3>
-                <button onclick="joinRoomPopup()">✅ เข้าร่วม</button>
-                <button onclick="closePopup()">❌ ยกเลิก</button>
-            </div>
-        </div> -->
         <ul id="roomList" class="room-list">
             {% for room in rooms %}
             <li data-room-id="{{ room.id }}" data-invite-code="{{ room.invite_code }}" onclick="loadRoom('{{ room.id }}', '{{ room.name }}', '{{ room.invite_code }}')">
                 <img src="{{ room.image.url }}" onerror="this.src='/media/default/room.jpg'">
-                <span>{{ room.name }}</span>
+                <span class="room-name">{{ room.name }}</span>
             </li>
-            {% endfor %}
+            {% endfor %} 
         </ul>
     </div>
-    <div class="main-content-area">
+        <div class="main-content-area">
         <div class="titles-container">
             <div class="room-title" data-menu-trigger-for="settingsMenu">
                 <h2 id="roomTitle">วัจนะโคลนนิ่ง ยินดีต้อนรับ 🥳</h2>
@@ -68,9 +60,9 @@
                     <!-- Room Settings Menu -->
                     <div id="settingsMenu" class="popup-menu room-settings-specific-styles">
                         <ul>
-                            <li>ตั้งค่าห้อง</li>
+                            <!-- <li>ตั้งค่าห้อง</li> -->
                             <li onclick="displayEditRoomProfileModal()">⚙️ แก้ไขโปรไฟล์ห้อง</li>
-                            <li onclick="copyInviteLink()">🔗 คัดลอกลิงก์</li>
+                            <li id="copyInviteLinkBtn" onclick="copyInviteLink()">🔗 คัดลอกลิงก์</li>
                             <li id="copyRoomCodeBtn" onclick="copyRoomCode()" style="display: none;">📄 คัดลอกรหัสห้อง
                             </li>
                             <li onclick="confirmLeaveRoom()" style="color: #dd6860;">🚪 ออกจากห้อง</li>
@@ -84,12 +76,17 @@
         </div>
         <div class="main-body-content-wrapper">
             <div class="chat-room">
+                <div id="chatMessages" class="chat-messages"></div>
+                <form id="chatForm" class="chat-form" autocomplete="off" >
+                    <input type="text" id="chatInput" placeholder="พิมพ์ข้อความ..." autocomplete="off" required>
+                    <button type="submit">ส่ง</button>
+                </form>
             </div>
             <div class="voice-room">
             </div>
         </div>
     </div>
-    <div class="right-column-area">
+        <div class="right-column-area">
         <div class="user-container">
             <div id="settingsBtn">
             </div>
@@ -99,14 +96,22 @@
                     <!-- <button id="settingsBtn" onclick="toggleSettingsMenu()" style="display:none;">ตั้งค่าห้อง</button> -->
                 </div>
                 <h3 id="welcome-message">สวัสดีชาวโลก</h3>
-                <h3 id="users-header" style="display: none;">ผู้ใช้</h3>
+                <h3 id="users-header" style="display: none;"></h3>
                 <ul id="userList" class="user-list"></ul>
             </div>
         </div>
         <div id="currentUserMenu" class="user-profile-options-menu">
             <ul>
                 <li onclick="displayEditProfileModal()">แก้ไขโปรไฟล์</li>
-                <li>เปลี่ยนสถานะ <span id="userMenuStatusText">[ออนไลน์]</span></li>
+                <li id="changeStatusMenuTrigger" style="position:relative;cursor:pointer;">เปลี่ยนสถานะ <span id="userMenuStatusText">[ออนไลน์]</span>
+                    <div id="userStatusPopup" class="popup-menu user-status-popup" style="display:none; position:absolute; left:0; top:100%; z-index:1000; min-width:160px; background:#23272a; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <ul style="margin:0;padding:8px 0;list-style:none;">
+                            <li onclick="setUserStatus('online')" style="padding:8px 20px;cursor:pointer;">🟢 ออนไลน์</li>
+                            <li onclick="setUserStatus('dnd')" style="padding:8px 20px;cursor:pointer;">🔕 ไม่รับแจ้งเตือน</li>
+                            <li onclick="setUserStatus('invisible')" style="padding:8px 20px;cursor:pointer;">👻 ล่องหน</li>
+                        </ul>
+                    </div>
+                </li>
                 <li>โหมด[มืด]</li>
                 <li onclick="confirmlogout()" style="color: #dd6860;">ออกจากระบบ</li>
             </ul>
@@ -118,6 +123,9 @@
             <div class="current-user-options-trigger">⋮</div>
         </div>
     </div>
+    </div>
+
+    <a id="sidebar-toggle" title="Toggle Sidebar"></a>
 
     <div id="genericModal" class="modal-overlay" style="display: none;">
         <div class="modal-content-box">
@@ -254,13 +262,40 @@
         </form>
     </template>
 
-    <script src="{% static 'voice_chat/js/script_03.2.1.js' %}"></script>
-    <script src="{% static 'voice_chat/js/script_03.3.js' %}"></script>
-    <script src="{% static 'voice_chat/js/popup_03.3.js' %}"></script>
+    <!-- User Context Menu (Right-click menu on a user) -->
+    <div id="userContextMenu" class="popup-menu user-context-specific-styles">
+        <ul>
+            <!-- Options will be dynamically generated by JavaScript -->
+        </ul>
+    </div>
+
+
+    <script src="{% static 'voice_chat/js/chat_rom_03.04.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.2.11.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.16.js' %}"></script>
+    <script src="{% static 'voice_chat/js/popup_03.6.js' %}"></script>
     <script>
         function logout() {
             window.location.href = "{% url 'logout' %}";
         }
+
+        // Popup สถานะผู้ใช้
+        document.addEventListener('DOMContentLoaded', function() {
+            const trigger = document.getElementById('changeStatusMenuTrigger');
+            const popup = document.getElementById('userStatusPopup');
+            if (trigger && popup) {
+                trigger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    popup.style.display = (popup.style.display === 'block') ? 'none' : 'block';
+                });
+                document.addEventListener('click', function(e) {
+                    if (popup.style.display === 'block' && !popup.contains(e.target) && e.target !== trigger) {
+                        popup.style.display = 'none';
+                    }
+                });
+            }
+        });
+
     </script>
 
 </body>

@@ -2,6 +2,8 @@ import os
 import uuid
 from django.contrib.auth.models import AbstractUser # type: ignore
 from django.db import models # type: ignore
+from django.utils import timezone # Import timezone
+from datetime import timedelta # Import timedelta
 
 
 def default_profile_image():
@@ -25,6 +27,26 @@ class CustomUser(AbstractUser):
     # --- เพิ่ม Field ใหม่สำหรับชื่อที่แสดง ---
     display_name = models.CharField(max_length=150, blank=True, verbose_name="ชื่อที่แสดง")
     # --- สิ้นสุดการเพิ่ม Field ใหม่ ---
+    
+    # --- เพิ่ม Field ใหม่สำหรับสถานะออนไลน์ ---
+    last_online = models.DateTimeField(null=True, blank=True)
+    # --- เพิ่ม Field ใหม่สำหรับสถานะ (online/dnd/invisible) ---
+    STATUS_CHOICES = [
+        ("online", "ออนไลน์"),
+        ("dnd", "ไม่รบกวน"),
+        ("invisible", "ซ่อนตัว")
+    ]
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="online")
+    # --- สิ้นสุดการเพิ่ม Field ใหม่ ---
+
+    # --- เพิ่ม Method สำหรับตรวจสอบสถานะออนไลน์ ---
+    def is_online(self):
+        if not self.last_online:
+            return False
+        # กำหนดว่าถ้า active ภายใน 60 วินาทีล่าสุด ถือว่าออนไลน์
+        # (เผื่อเวลาจาก heartbeat ที่ส่งทุก 30 วินาที)
+        return timezone.now() < self.last_online + timedelta(seconds=60)
+    # --- สิ้นสุด Method ใหม่ ---
 
     def get_profile_image_url(self):
         if self.profile_image and hasattr(self.profile_image, "url"):

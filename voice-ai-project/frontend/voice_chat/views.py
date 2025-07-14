@@ -1,14 +1,18 @@
 from django.shortcuts import render, get_object_or_404  # type: ignore
-from django.http import JsonResponse  # type: ignore
-from django.views.decorators.http import require_POST # type: ignore
-from .models import Room, RoomParticipant, RoomRole, Message
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from .models import Room, RoomParticipant, RoomRole, Message 
 from django.contrib.auth.decorators import login_required  # type: ignore
-from django.utils.timezone import localtime  # type: ignore
+from django.utils.timezone import localtime
+from django.utils import timezone
 from django.core.files.base import ContentFile  # type: ignore
-from channels.layers import get_channel_layer # type: ignore
-from asgiref.sync import async_to_sync # type: ignore
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from django.shortcuts import redirect  # type: ignore
 import os # For file operations
+from users.models import CustomUser # For getting user objects
+import json
 
 
 @login_required
@@ -24,51 +28,43 @@ def create_room(request):
 
         if not name:
             return JsonResponse({"error": "กรุณาใส่ชื่อห้อง"}, status=400)
-        if Room.objects.filter(name=name).exists():
-            return JsonResponse({"error": "ชื่อห้องนี้ถูกใช้แล้ว"}, status=400)
+        # อนุญาตให้ชื่อห้องซ้ำกันได้ ไม่ต้องเช็คซ้ำ
 
-        # สร้างห้อง (ยังไม่บันทึกลง DB ทันที)
-        room = Room.objects.create(
+        # 1. สร้าง instance ของ Room แต่ยังไม่บันทึกลง DB
+        room = Room(
             name=name,
             owner=request.user,
         )
 
-        # หากมีการอัปโหลดรูปภาพ ให้บันทึกลง storage
-        # room.image.save() จะทำการบันทึก instance ของ Room ด้วย
+        # 2. กำหนดค่า image ถ้ามี
         if image:
-            room.image.save(
-                f"room_images/{room.id}_{image.name}", ContentFile(image.read()))
-        # หากไม่มี image, default image จะถูกใช้โดยอัตโนมัติเมื่อ room ถูกสร้าง
-        # ไม่จำเป็นต้องเรียก room.save() อีกครั้งที่นี่ เพราะ Room.objects.create() ได้บันทึกไปแล้ว
+            room.image = image
 
+        # 3. บันทึก instance ลง DB เพียงครั้งเดียว
+        # การเรียก .save() ที่นี่จะไป trigger custom save() ใน model
+        # ซึ่งจะสร้าง invite_code และบันทึกไฟล์รูปภาพให้โดยอัตโนมัติ
+        room.save()
+        
         # กำหนดให้ owner มีบทบาทเป็น "เจ้าของห้อง"
         owner_role = RoomRole.objects.create(
-            room=room, role_name="Owner", permissions="all")
+            room=room, 
+            role_name="owner", # ใช้ตัวพิมพ์เล็กให้ตรงกับ choices ใน model
+            permissions={ # ตัวอย่าง permissions
+                "can_delete_room": True,
+                "can_edit_room": True,
+                "can_assign_roles": True,
+                "can_kick_members": True
+            }
+        )
         RoomParticipant.objects.create(
             room=room, user=request.user, role=owner_role)
 
-        return JsonResponse({"room_id": room.id, "room_name": room.name, "image_url": room.image.url})
-
-
-@login_required
-def send_message(request, room_id):
-    room = get_object_or_404(Room, id=room_id)
-    content = request.POST.get("content", "").strip()
-
-    if not content:
-        return JsonResponse({"error": "ไม่สามารถส่งข้อความว่างเปล่าได้"}, status=400)
-
-    if not RoomParticipant.objects.filter(room=room, user=request.user).exists():
-        return JsonResponse({"error": "คุณไม่ได้เป็นสมาชิกของห้องนี้"}, status=403)
-
-    message = Message.objects.create(
-        room=room, user=request.user, content=content)
-
-    return JsonResponse({
-        "message": message.content,
-        "sent_at": localtime(message.created_at).strftime("%Y-%m-%d %H:%M:%S"),
-        "username": message.user.username
-    })
+        return JsonResponse({
+            "room_id": room.id, 
+            "room_name": room.name, 
+            "image_url": room.image.url,
+            "invite_code": room.invite_code # เพิ่ม invite_code ในการตอบกลับ
+        })
 
 
 @login_required
@@ -81,7 +77,7 @@ def get_rooms(request):
             "id": room.id,
             "name": room.name,
             "image_url": room.image.url if room.image else "/media/default/room.jpg",
-            "invite_code": room.invite_code,  # ✅ เพิ่มให้แน่ใจว่าโค้ดถูกส่งมา
+            "invite_code": room.invite_code or "",  # ✅ แปลงค่า None เป็นสตริงว่าง
         }
         for room in user_rooms
     ]
@@ -99,7 +95,8 @@ def leave_room(request, room_id):
     if not participant:
         return JsonResponse({"success": False, "message": "คุณไม่ได้อยู่ในห้องนี้"})
 
-    # ลบการเป็นสมาชิกของห้องออก
+    # ✅ ลบการเป็นสมาชิกของห้องออก (ถูกต้องแล้ว)
+    # การแจ้งเตือนจะเกิดขึ้นโดยอัตโนมัติเมื่อ WebSocket ของผู้ใช้คนนี้ disconnect
     participant.delete()
 
     return JsonResponse({"success": True, "message": "ออกจากห้องเรียบร้อยแล้ว!"})
@@ -113,16 +110,22 @@ def get_room_members(request, room_id):
     
     room_participants = RoomParticipant.objects.filter(room=room).select_related("user", "role") # เปลี่ยนชื่อตัวแปร
 
+
     members_data = [
         {
             "id": participant.user.id,
-            "username": participant.user.username, # คุณอาจจะยังต้องการ username ไว้สำหรับอ้างอิงภายใน
-            "name_to_display": participant.user.get_name_to_display(), # <<< เพิ่มบรรทัดนี้
+            "username": participant.user.username,
+            "name_to_display": participant.user.get_name_to_display(),
             "profile_image": participant.user.get_profile_image_url(),
-            "role": participant.role.role_name if participant.role else "Member",
+            "status": getattr(participant.user, "status", "online"),
+            "role": participant.role.role_name if participant.role else "member",
         }
-        for participant in room_participants # เปลี่ยน member เป็น participant
+        for participant in room_participants
     ]
+
+    # เรียงลำดับ: online > dnd > invisible
+    status_order = {"online": 0, "dnd": 1, "invisible": 2}
+    members_data.sort(key=lambda member: status_order.get(member["status"], 3))
 
     return JsonResponse({"members": members_data})
 
@@ -139,31 +142,6 @@ def search_room(request, invite_code):
 
 
 @login_required
-def redirect_home_with_invite(request, invite_code):
-
-    room = Room.objects.filter(invite_code=invite_code).first()
-    if not room:
-        return JsonResponse({"error": "ไม่พบห้องนี้"}, status=404)
-
-    return JsonResponse({
-        "room_name": room.name,
-        "room_image": room.image.url if room.image else "/media/default/room.jpg",
-    })
-
-
-@login_required
-def update_room_members(room_id):
-    members = get_room_members(room_id)  # ดึงข้อมูลสมาชิก
-
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"chatroom_{room_id}",
-        {
-            "type": "send_update",
-            "members": members,
-        }
-    )
-
 def check_auth(request):
     return JsonResponse({"isAuthenticated": request.user.is_authenticated})
 
@@ -188,7 +166,12 @@ def join_room_by_invite(request, invite_code):
 
     # ค้นหา Role เริ่มต้น
     default_role, created = RoomRole.objects.get_or_create(
-        room=room, role_name="Member", defaults={"permissions": "read,write"}
+        room=room, 
+        role_name="member", # ใช้ตัวพิมพ์เล็กให้ตรงกับ choices ใน model
+        defaults={"permissions": {
+            "can_edit_room": False,
+            "can_assign_roles": False
+        }}
     )
 
     # เพิ่มสมาชิกเข้าไปในห้อง
@@ -291,3 +274,129 @@ def update_room_profile(request, room_id):
         "room_name": room.name,
         "image_url": room.image.url # ส่ง URL ของรูปภาพใหม่กลับไปด้วย
     })
+
+@login_required
+@require_POST
+def assign_role_api(request, room_id):
+    """
+    API to assign a new role to a user in a room.
+    Roles: owner, admin, family, member
+    """
+    try:
+        # 1. Get data from request
+        target_user_id = int(request.POST.get('user_id'))
+        new_role_name = request.POST.get('role_name')
+
+        if new_role_name not in ['admin', 'family', 'member']:
+            return JsonResponse({"error": "สถานะที่เลือกไม่ถูกต้อง"}, status=400)
+
+        # 2. Get objects from DB
+        room = get_object_or_404(Room, id=room_id)
+        actor = get_object_or_404(RoomParticipant, room=room, user=request.user)
+        target_user = get_object_or_404(CustomUser, id=target_user_id)
+        target = get_object_or_404(RoomParticipant, room=room, user=target_user)
+
+        # 3. Permission Checks
+        # Only Owner or Admin can assign roles
+        if actor.role.role_name not in ['owner', 'admin']:
+            return JsonResponse({"error": "คุณไม่มีสิทธิ์มอบสถานะให้ผู้อื่น"}, status=403)
+
+        # Cannot change your own role
+        if actor.user.id == target.user.id:
+            return JsonResponse({"error": "คุณไม่สามารถเปลี่ยนสถานะของตัวเองได้"}, status=400)
+
+        # Cannot change Owner's role
+        if target.role.role_name == 'owner':
+            return JsonResponse({"error": "ไม่สามารถเปลี่ยนสถานะของเจ้าของห้องได้"}, status=403)
+        
+        # Admin cannot assign 'admin' or 'owner' roles
+        if actor.role.role_name == 'admin' and new_role_name in ['admin', 'owner']:
+             return JsonResponse({"error": "แอดมินไม่สามารถมอบสถานะที่สูงกว่าหรือเท่ากับตัวเองได้"}, status=403)
+
+        # 4. Find or create the new role for this specific room
+        new_role, created = RoomRole.objects.get_or_create(room=room, role_name=new_role_name)
+
+        # 5. Assign the new role
+        target.role = new_role
+        target.save(update_fields=['role'])
+
+        # 6. Broadcast the change via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'room_{room.id}',
+            {
+                'type': 'role_changed',
+                'user_id': target.user.id,
+                'new_role': new_role.role_name,
+            }
+        )
+
+        return JsonResponse({"success": True, "message": f"เปลี่ยนสถานะของ {target.user.get_name_to_display()} เป็น {new_role.get_role_name_display()} สำเร็จ"})
+
+    except (RoomParticipant.DoesNotExist, CustomUser.DoesNotExist, Room.DoesNotExist):
+        return JsonResponse({"error": "ไม่พบผู้ใช้หรือห้อง"}, status=404)
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "ข้อมูลที่ส่งมาไม่ถูกต้อง"}, status=400)
+
+@login_required
+def get_chat_messages(request, room_id):
+    """
+    API Endpoint to fetch the chat history for a specific room.
+    """
+    messages = Message.objects.filter(room_id=room_id).order_by('created_at').select_related('user')
+    data = []
+    for msg in messages:
+        data.append({
+            'id': msg.id,
+            'user': {
+                'id': msg.user.id,
+                'display_name': msg.user.get_name_to_display(),
+                'profile_image_url': msg.user.get_profile_image_url(),
+            },
+            'content': msg.content,
+            'created_at': msg.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        })
+    return JsonResponse({'messages': data}, safe=False)
+
+@csrf_exempt
+@login_required
+def send_message(request, room_id):
+    """
+    API Endpoint to send a message to a room.
+    The message is saved and then broadcasted via WebSocket.
+    """
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        content = data.get('content', '').strip()
+        if not content:
+            return JsonResponse({'error': 'Empty message'}, status=400)
+        room = Room.objects.get(id=room_id)
+        msg = Message.objects.create(
+            room=room,
+            user=request.user,
+            content=content,
+            created_at=timezone.now()
+        )
+        # Broadcast ไปยัง group ของห้องนี้
+        channel_layer = get_channel_layer() # type: ignore
+        async_to_sync(channel_layer.group_send)(
+            f'room_{room_id}',
+            {
+                'type': 'chat_message',
+                'message': {
+                    'id': msg.id,
+                    'user': {
+                        'id': request.user.id,
+                        'display_name': request.user.get_name_to_display(),
+                        'profile_image_url': request.user.get_profile_image_url(),
+                    },
+                    'content': msg.content,
+                    'created_at': msg.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                }
+            }
+        )
+        # ไม่ต้องส่งข้อมูลข้อความกลับไปใน HTTP response
+        # เพราะ client จะได้รับข้อความผ่าน WebSocket อยู่แล้ว
+        # การส่งกลับไปจะทำให้ข้อความแสดงผลซ้ำ
+        return JsonResponse({'status': 'success', 'message': 'Message sent'}, status=201)
+    return JsonResponse({'error': 'Invalid method'}, status=405)

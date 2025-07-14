@@ -5,6 +5,47 @@ from .forms import CustomUserCreationForm
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from channels.layers import get_channel_layer # For WebSocket broadcast
+from asgiref.sync import async_to_sync       # For WebSocket broadcast
+from voice_chat.models import RoomParticipant # To find user's rooms
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import update_session_auth_hash, get_user_model
+from django.contrib.auth.forms import PasswordChangeForm # เราอาจจะไม่ได้ใช้โดยตรง แต่เป็นแนวทางที่ดี
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password # สำหรับตรวจสอบความแข็งแรงของรหัสผ่านใหม่
+
+# --- API สำหรับเปลี่ยนสถานะผู้ใช้ (online/dnd/invisible) ---
+from django.contrib.auth import get_user_model
+CustomUser = get_user_model()
+
+@login_required
+@require_POST
+@csrf_exempt
+def set_status_api(request):
+    user = request.user
+    new_status = request.POST.get('status')
+    if new_status not in dict(CustomUser.STATUS_CHOICES):
+        return JsonResponse({'error': 'สถานะไม่ถูกต้อง'}, status=400)
+    user.status = new_status
+    user.save(update_fields=['status'])
+
+    # Broadcast ไปยังสมาชิกในห้อง (ทุกห้องที่ user อยู่)
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    from voice_chat.models import RoomParticipant
+    channel_layer = get_channel_layer()
+    participations = RoomParticipant.objects.filter(user=user)
+    for p in participations:
+        room_group_name = f'room_{p.room.id}'
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'user_status',
+                'user_id': user.id,
+                'status': user.status,
+            }
+        )
+    return JsonResponse({'success': True, 'status': user.status})
 
 def register(request):
     if request.method == "POST":
@@ -84,6 +125,25 @@ def update_profile_api(request):
     
     try:
         user.save() # method save ของ CustomUser ที่เรา override จะตั้ง display_name = username ถ้า display_name ว่าง (แต่ในเคสนี้เราตั้งค่าแล้ว)
+
+        # --- VVV เพิ่มการ Broadcast การอัปเดตโปรไฟล์ผ่าน WebSocket VVV ---
+        channel_layer = get_channel_layer()
+        # ค้นหาทุกห้องที่ผู้ใช้นี้เป็นสมาชิกอยู่
+        user_participations = RoomParticipant.objects.filter(user=user)
+        
+        for participation in user_participations:
+            room_group_name = f'room_{participation.room.id}'
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'profile_update', # ชื่อ event handler ใน consumer
+                    'user_id': user.id,
+                    'display_name': user.get_name_to_display(),
+                    'profile_image_url': user.get_profile_image_url(),
+                }
+            )
+        # --- ^^^ สิ้นสุดการ Broadcast ^^^ ---
+
         updated_user_data = {
             'username': user.username,
             'display_name': user.get_name_to_display(), # ใช้ get_name_to_display เพื่อความสอดคล้อง
@@ -93,25 +153,21 @@ def update_profile_api(request):
     except Exception as e: # เช่น Database error หรือ Model validation error อื่นๆ
         return JsonResponse({'error': {'__all__': [str(e)]}}, status=500)
     
-@login_required # ทำให้ API นี้เรียกได้เฉพาะผู้ที่ login แล้วเท่านั้น
+@login_required
 def get_current_user_profile_api(request):
-    user = request.user # request.user คือ CustomUser instance ของผู้ใช้ที่ login อยู่
-
+    user = request.user
     user_data = {
         'id': user.id,
         'username': user.username,
         'email': user.email,
         'first_name': user.first_name,
         'last_name': user.last_name,
-        'display_name': user.get_name_to_display(), # ใช้ method จาก model ของคุณ
-        'profile_image_url': user.get_profile_image_url() # ใช้ method จาก model ของคุณ
+        'display_name': user.get_name_to_display(),
+        'profile_image_url': user.get_profile_image_url(),
+        'status': user.status,  # คืนค่าสถานะจริง
     }
     return JsonResponse({'isAuthenticated': True, 'user': user_data})
 
-from django.contrib.auth import update_session_auth_hash, get_user_model
-from django.contrib.auth.forms import PasswordChangeForm # เราอาจจะไม่ได้ใช้โดยตรง แต่เป็นแนวทางที่ดี
-from django.core.exceptions import ValidationError
-from django.contrib.auth.password_validation import validate_password # สำหรับตรวจสอบความแข็งแรงของรหัสผ่านใหม่
 
 CustomUser = get_user_model() # ดึง CustomUser model ที่คุณใช้อยู่
 

@@ -1,5 +1,5 @@
 from django.db import models # type: ignore
-import uuid, os
+import uuid, os, random
 from users.models import CustomUser 
 from django.utils import timezone # type: ignore
 
@@ -13,7 +13,7 @@ def room_image_upload_path(instance, filename):
 
 # Rooms Table
 class Room(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)  # เอา unique ออก ชื่อซ้ำได้
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_rooms")
     image = models.ImageField(upload_to='room_images/', null=True, blank=True, default=default_room_image)
     invite_code = models.CharField(max_length=8, unique=True, blank=True, null=True)
@@ -21,7 +21,7 @@ class Room(models.Model):
     def save(self, *args, **kwargs):
         if not self.invite_code:
             while True:
-                new_code = str(uuid.uuid4())[:8]
+                new_code = f"{random.randint(0, 999999):06d}"
                 if not Room.objects.filter(invite_code=new_code).exists():
                     self.invite_code = new_code
                     break
@@ -29,9 +29,21 @@ class Room(models.Model):
 
 # RoomRoles Table
 class RoomRole(models.Model):
+    ROLE_CHOICES = [
+        ('owner', 'Owner'),
+        ('admin', 'Admin'),
+        ('family', 'Family'),
+        ('member', 'Member'),  # Default role
+    ]
+
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="roles")
-    role_name = models.CharField(max_length=50)
-    permissions = models.TextField()
+    role_name = models.CharField(max_length=50, choices=ROLE_CHOICES, default='member')
+    # ปรับปรุง field permissions ให้เป็น JSONField เพื่อความยืดหยุ่น
+    permissions = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.get_role_name_display()} in {self.room.name}"
+
 
     class Meta:
         db_table = "voice_chat_roomrole"
@@ -45,6 +57,22 @@ class RoomParticipant(models.Model):  # เปลี่ยนจาก RoomMembe
 
     class Meta:
         db_table = "voice_chat_roomparticipant"  # ✅ แก้ชื่อให้ตรงกับตารางที่ถูกสร้าง
+
+    def can(self, action):
+        """Check if a participant has permission to perform an action."""
+        if self.role:
+            # เจ้าของห้องมีสิทธิ์ทุกอย่าง
+            if self.role.role_name == 'owner':
+                return True
+
+            # ตรวจสอบ permission จาก role
+            permissions = self.role.permissions
+            if isinstance(permissions, dict) and permissions.get(action, False):
+                return True
+
+        return False # Default: no permission
+
+
         
 # Messages Table
 class Message(models.Model):

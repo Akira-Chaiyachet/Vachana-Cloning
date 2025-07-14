@@ -1,0 +1,99 @@
+/*
+  Styles for the collapsible sidebar functionality.
+*/
+
+/* --- Container and Layout --- */
+#app-container {
+    display: flex;
+    height: 100vh;
+    overflow-x: hidden; /* Prevents horizontal scrollbar during transition */
+}
+
+/* --- Sidebar States --- */
+.sidebar {
+    transition: width 0.3s ease-in-out;
+    flex-shrink: 0; /* Prevent sidebar from shrinking when window is narrow */
+}
+
+.sidebar .sidebar-title-short {
+    display: none;
+}
+
+/* Collapsed State */
+#app-container.sidebar-collapsed .sidebar {
+    width: 80px; /* Width when collapsed */
+}
+
+#app-container.sidebar-collapsed .sidebar-title-full,
+#app-container.sidebar-collapsed .input_search,
+#app-container.sidebar-collapsed .room-name { /* เพิ่ม !important เพื่อให้แน่ใจว่าถูกซ่อน */
+    display: none !important;
+}
+
+
+#app-container.sidebar-collapsed .sidebar-title-short {
+    display: inline;
+}
+
+#app-container.sidebar-collapsed .icon_VC {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    flex-direction: column;
+    align-items: center;
+}
+
+#app-container.sidebar-collapsed .icon_VC h3 {
+    font-size: 1.2em;
+    margin: 0;
+}
+
+#app-container.sidebar-collapsed .icon_VC button {
+    margin-top: 10px;
+}
+
+#app-container.sidebar-collapsed .group_search {
+    justify-content: center;
+}
+
+#app-container.sidebar-collapsed .room-list li {
+    justify-content: center;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+#app-container.sidebar-collapsed .room-list li img {
+    margin-right: 0;
+}
+
+/* --- Toggle Button --- */
+#sidebar-toggle {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 2000;
+    width: 40px;
+    height: 40px;
+    background-color: #40444b;
+    color: #dcddde;
+    border: none;
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease-in-out, background-color 0.2s;
+}
+
+#sidebar-toggle:hover {
+    background-color: #5c616a;
+    transform: scale(1.1);
+}
+
+#sidebar-toggle::before {
+    content: '‹'; /* Left-pointing angle bracket */
+}
+
+#app-container.sidebar-collapsed #sidebar-toggle::before {
+    content: '›'; /* Right-pointing angle bracket */
+}

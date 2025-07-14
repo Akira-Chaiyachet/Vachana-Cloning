@@ -12,10 +12,12 @@ urlpatterns = [
     path("api/check-auth/", views.check_auth, name="check_auth"),
     path("get-rooms/", views.get_rooms, name="get_rooms"),
     path("get-room-members/<int:room_id>/", views.get_room_members, name="get_room_members"),
-    path('send-message/<int:room_id>/', views.send_message, name='send_message'),
     path("leave-room/<int:room_id>/", views.leave_room, name="leave_room"),
     path("api/search-room/<str:invite_code>/", views.search_room, name="search-room"),
     path("api/get-room-link/<str:invite_code>/", views.get_room_link, name="get_room_link"),
     path('rooms/api/update-room-profile/<int:room_id>/', views.update_room_profile, name='update_room_profile'),
     path('rooms/api/room-details/<int:room_id>/', views.get_room_details, name='get_room_details'),
+    path('api/room/<int:room_id>/assign-role/', views.assign_role_api, name='assign_role_api'), # API สำหรับเปลี่ยน Role
+    path('api/room/<int:room_id>/messages/', views.get_chat_messages, name='get_chat_messages'),
+    path('api/room/<int:room_id>/send-message/', views.send_message, name='send_message'),
 ]

@@ -34,6 +34,7 @@ WebSocket
 mysql -u root -p
 rootpassword
 VC@V-ai2025
+rootpassword
 django_user
 
 

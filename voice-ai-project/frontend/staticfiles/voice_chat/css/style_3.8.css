@@ -1,0 +1,803 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #93ada4;
+    background:rgb(60, 64, 68);
+    /* display: flex และ height: 100vh ถูกย้ายไปที่ #app-container ในไฟล์ sidebar-toggle.css
+       เพื่อให้ปุ่ม toggle อยู่นอก flex layout หลักได้ */
+}
+
+.sidebar {
+    width: 250px; /* กำหนดความกว้างเริ่มต้นที่แน่นอน */
+    flex-shrink: 0; /* ป้องกันไม่ให้ sidebar หดตัวเมื่อหน้าจอแคบ */
+    background:rgb(51, 54, 57);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    color: #93ada4;
+}
+
+.icon_VC {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px; /* ปรับระยะห่างระหว่างข้อความกับปุ่ม */
+}
+
+.icon_VC h3 {
+    margin: 0; /* ลบ margin เพื่อให้ชิดกับปุ่ม */
+    cursor: pointer;
+}
+
+.icon_VC button {
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.right-column-area {
+    display: flex;
+    flex-direction: column; /* จัดเรียง .user-container และ .current-user-display ในแนวตั้ง */
+    width: 200px;          /* ความกว้างของคอลัมน์ขวา */
+    flex-shrink: 0;        /* ป้องกันไม่ให้คอลัมน์นี้หดตัว */
+    height: 100%;          /* ให้สูงเต็มพื้นที่ของ body */
+    box-sizing: border-box;
+    background-color: #464b50; /* สีพื้นหลังหลักของคอลัมน์ขวา */
+    position: relative; /* สำคัญสำหรับ #currentUserMenu ที่จะอ้างอิงตำแหน่ง */
+}
+.user-container {
+    padding: 15px;
+    position: relative; /* ยังคงใช้ได้ */
+    display: flex;
+    flex-direction: column;
+    width: 100%; /* ให้กว้างเต็ม .right-column-area */
+    box-sizing: border-box;
+    flex-grow: 1; /* << ให้ .user-container ยืดเต็มพื้นที่ที่เหลือใน .right-column-area ก่อนถึง .current-user-display */
+    min-height: 0; /* ช่วยให้การยืดหยุ่นและการ scroll ภายในทำงานได้ดี */
+    /* background-color: #464b50; /* อาจจะไม่ต้องใส่ถ้า .right-column-area มีสีเดียวกันแล้ว */
+    /* height: auto; /* ไม่ต้องกำหนด height เต็มแล้ว ปล่อยให้ flex-grow จัดการ */
+}
+
+.current-user-display {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #36393f;
+    border-top: 1px solid #40444B;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 0;
+    /* position: relative; /* อาจจะไม่จำเป็นแล้ว ถ้า #currentUserMenu อ้างอิงจาก .right-column-area */
+    /* border: 2px dashed limegreen; /* ลบเส้นขอบ Debug ออก */
+}
+#currentUserMenu {
+    display: none; /* เริ่มต้นซ่อนไว้ */
+    position: absolute; /* อ้างอิงตำแหน่งจาก .right-column-area */
+
+    /* จัดตำแหน่งให้อยู่เหนือ .current-user-display */
+    /* .current-user-display สูงประมาณ 52px (padding 10+10 + img 32) */
+    /* เราจะตั้ง bottom ให้ห่างจากขอบล่างของ .right-column-area ขึ้นมาเท่ากับความสูงของ .current-user-display + gap */
+    bottom: 57px;  /* << ลองเริ่มจากค่านี้นะครับ (52px + 5px gap) คุณอาจจะต้องปรับค่านี้เล็กน้อย */
+    right: 0;      /* ชิดขอบขวาของ .right-column-area */
+                   /* ถ้า .right-column-area มี padding ขวา (เช่น 15px) อาจจะต้องใช้ right: 15px; */
+    width: 220px;
+    background-color: rgb(51, 54, 57);
+    border: 1px solid rgb(70, 73, 77);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
+    z-index: 1050; /* หรือค่าที่เหมาะสมเพื่อให้แสดงผลทับ element อื่น */
+    color: #93ada4;
+}
+
+/* สไตล์ของ ul และ li ภายใน #currentUserMenu ยังคงเดิม */
+#currentUserMenu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#currentUserMenu li {
+    padding: 12px 18px;
+    cursor: pointer;
+    border-bottom: 1px solid #4a4e53;
+    font-size: 0.9rem;
+    transition: background-color 0.15s ease-in-out;
+}
+#currentUserMenu li a {
+    text-decoration: none; /* คำสั่งนี้จะเอาขีดเส้นใต้ออก */
+    color: inherit;        /* ให้สีของลิงก์สืบทอดมาจาก <li> (แต่ style inline ของคุณจะยังคงทับอยู่) */
+}
+#currentUserMenu li:last-child {
+    border-bottom: none;
+}
+
+#currentUserMenu li:hover {
+    background-color: #4a4e53;
+    color: #ffffff;
+}
+.current-user-display:hover {
+    background-color: #3C3F45;
+}
+.current-user-name-text {
+    color: #93ada4;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px; /* ปรับค่านี้ตามความเหมาะสม */
+}
+.current-user-options-trigger {
+    margin-left: auto; /* ดันจุด 3 จุดไปทางขวาสุด */
+    padding: 5px 8px; /* เพิ่มพื้นที่ให้คลิกง่ายขึ้น */
+    color: #93ada4;   /* สีของจุด */
+    font-size: 20px;   /* ขนาดของสัญลักษณ์จุด */
+    cursor: pointer;
+    line-height: 1;    /* ช่วยจัดตำแหน่งในแนวตั้ง */
+    border-radius: 4px;
+}
+
+.current-user-options-trigger:hover {
+    color: #ceffea;
+    background-color: rgba(255, 255, 255, 0.1); /* สีพื้นหลังเมื่อเมาส์ชี้ (ถ้าต้องการ) */
+}
+.current-user-avatar-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
+}
+
+.settings-menu {
+    display: none;
+    position: absolute;
+    top: 50px;
+    right: 20px;
+    background:rgb(51, 54, 57);
+    border: 1px solid #93ada4;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    z-index: 100;
+    color: #93ada4;
+}
+
+.settings-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: #93ada4;
+}
+
+.settings-menu li {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #93ada4;
+    color: #93ada4;
+}
+
+.settings-menu li:hover {
+    background: #464646;
+    color: #93ada4;
+}
+
+.user-body {
+    /* flex: 1; /* ยังคงใช้ได้เพื่อให้ .user-body ยืดใน .user-container */
+    flex-grow: 1; /* ชัดเจนกว่า */
+    padding: -160px 8px; /* เพิ่มพื้นที่ให้คลิกง่ายขึ้น */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* overflow-y: auto; /* ย้ายไปให้ #userList จัดการ scroll เอง */
+}
+#userList { /* หรือ .user-list ตามที่คุณใช้ */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* ให้ user-list ยืดเต็มพื้นที่ใน .user-body */
+    overflow-y: auto; /* ให้ scrollbar เกิดที่นี่ */
+    /* max-height: 250px; /* เอาออก เพื่อให้ flex-grow ทำงาน */
+    /* Scrollbar styles for #userList ... (เหมือนเดิม) */
+}
+#userList::-webkit-scrollbar { width: 8px; }
+#userList::-webkit-scrollbar-track { background: transparent; border-radius: 4px; transition: background-color 0.2s ease; }
+#userList::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background-color 0.2s ease; }
+#userList:hover::-webkit-scrollbar-track { background: #2E3338; }
+#userList:hover::-webkit-scrollbar-thumb { background: #202225; }
+#userList:hover::-webkit-scrollbar-thumb:hover { background: #1A1B1E; }
+.user-header {
+    display: flex;
+    align-items: center; /* จัดให้ข้อความและปุ่มอยู่แนวเดียวกัน */
+    flex-wrap: wrap; /* ถ้าข้อความยาว ให้ปุ่มไปอยู่ด้านล่าง */
+    position: relative;
+    gap: 8px; /* ให้ปุ่มห่างจากข้อความนิดหน่อย */
+    max-width: 100%;
+    margin-top: -40px;
+}
+#settingsBtn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    margin-left: 8px; /* ระยะห่างปกติ */
+    position:relative;
+    align-self: center; /* ให้ปุ่มอยู่แนวเดียวกับ h2 */
+}
+.main-content-area {
+    display: flex;
+    flex-direction: column; /* จัดเรียง .titles-container และ .chat-room ในแนวตั้ง */
+    flex-grow: 1; /* ทำให้ส่วนนี้ขยายเต็มพื้นที่ที่เหลือ */
+    min-width: 0; /* ป้องกันปัญหา flexbox overflow กับ content ที่ยาวๆ */
+    /* ไม่จำเป็นต้องกำหนด width: 100% เมื่อใช้ flex-grow: 1 */
+}
+.titles-container {
+    display: flex; /* จัดเรียง .room-title และ .voie-room-title ในแนวนอน */
+    width: 100%;   /* ให้กว้างเต็ม .main-content-area */
+    flex-shrink: 0; /* ป้องกันไม่ให้ส่วน title นี้หดตัวเมื่อ .chat-room ขยาย */
+}
+/* .room-title (Trigger และ Positioning Context) */
+.room-title {
+    /* สไตล์เดิมของคุณ เช่น width, background-color, max-height, margin-top */
+    width: 70%; /* หรือ 100% ตาม layout ของคุณ */
+    box-sizing: border-box; 
+    background-color: rgb(70, 75, 80);
+    border-right: 1px solid #97b8b462;
+    border-radius: 0;
+    margin-top: -1px;
+    max-height: 45px;
+    padding: 0 10px; 
+
+    display: flex;
+    align-items: center; /* จัด h2 และ ไอคอน ให้อยู่กึ่งกลางแนวตั้ง */
+    /* justify-content: space-between; /* ไม่ใช้แล้ว เพราะไอคอนจะอยู่ติดกับชื่อ */
+    position: relative; /* <<<< สำคัญมาก! เพื่อให้ #settingsMenu อ้างอิงตำแหน่งจาก .room-title */
+    cursor: pointer;
+}
+
+.room-title h2 { /* ชื่อห้อง */
+    margin: 0;
+    flex-grow: 1; /* ให้ชื่อห้องยืดเต็มพื้นที่ที่เหลือทางซ้าย */
+    padding-right: 10px; /* เว้นระยะห่างจากไอคอน */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* ... สไตล์สี, ขนาดตัวอักษร อื่นๆ ... */
+    color: #e0e0e0;
+    font-size: 16px;
+}
+.voie-room-title {
+    width: 30%; /* ทำให้ div นี้กว้างเต็ม .main-content-area */
+    box-sizing: border-box; 
+    background-color: rgb(46, 51, 56);
+    box-sizing: border-box;
+    border-radius: 0;
+    margin-top: -15px;
+    max-height: 45px;
+}
+.main-body-content-wrapper {
+    display: flex; /* << ทำให้ .chat-room และ .voice-room อยู่ข้างกัน */
+    flex-direction: row; /* (เป็นค่า default อยู่แล้ว แต่ใส่เพื่อความชัดเจน) */
+    width: 100%;
+    flex-grow: 1;   /* << ให้ wrapper นี้ยืดเต็มพื้นที่แนวตั้งที่เหลือ */
+    min-height: 0;  /* สำคัญสำหรับ nested flex ที่มี scroll */
+}
+.chat-room {
+    width: 70%; /* ทำให้ div นี้กว้างเต็ม .main-content-area */
+    background-color: rgb(70, 75, 80);
+    border-top: 1px solid #97b8b462;
+    border-right: 1px solid #97b8b462;
+    flex-grow: 1; /* ให้ .chat-room ยืดเต็มพื้นที่แนวตั้งที่เหลือ */
+    padding: 15px;
+    box-sizing: border-box;
+    overflow-y: auto; /* ทำให้มี scrollbar เมื่อข้อความแชทเยอะ */
+    min-height: 0; /* สำคัญสำหรับ flex item ที่มี scroll */
+    max-height: 1000px;
+}
+.voice-room {
+    width: 30%; /* ทำให้ div นี้กว้างเต็ม .main-content-area */
+    background-color: rgb(46, 51, 56);
+    border-top: 1px solid #97b8b462;
+    flex-grow: 1; /* ให้ .chat-room ยืดเต็มพื้นที่แนวตั้งที่เหลือ */
+    padding: 15px;
+    box-sizing: border-box;
+    overflow-y: auto; /* ทำให้มี scrollbar เมื่อข้อความแชทเยอะ */
+    min-height: 0; /* สำคัญสำหรับ flex item ที่มี scroll */
+    max-height: 1000px;
+}
+#roomTitle {
+    color: #93ada4;
+    font-size: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 800px; /* ปรับค่านี้ตามความเหมาะสม */
+    text-align: center;
+}
+@media (max-width: 600px) {
+    #settingsBtn {
+        position: absolute;
+        bottom: -25px;
+        right: 0;
+    }
+}
+.user-footer {
+    padding: 10px;
+    border-top: 1px solid #ccc;
+    display: flex;
+}
+
+.user-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    
+}
+.user-list .user-display-name { /* Target the new class */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px; /* ปรับค่านี้ตามความเหมาะสม */
+
+}
+.user-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer; /* <-- เพิ่มเพื่อให้รู้สึกว่าคลิกได้ */
+    border-radius: 3px;
+    margin: 1px 0;
+    transition: background-color 0.1s ease-in-out;
+}
+
+.user-list li:hover {
+    background-color: #3a3c43; /* <-- เพิ่มเอฟเฟกต์เมื่อเมาส์ชี้ */
+}
+
+.user-list img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.user-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.user-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.user-list::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.user-list:hover::-webkit-scrollbar-track {
+    background: #2E3338;
+}
+
+.user-list:hover::-webkit-scrollbar-thumb {
+    background: #202225;
+}
+
+.user-list:hover::-webkit-scrollbar-thumb:hover {
+    background: #1A1B1E;
+}
+.room-list {
+    list-style: none;
+    padding: 0;
+    margin: 0; /* เพิ่มเติม: เพื่อลบ margin ที่อาจมีอยู่ */
+    max-height: 800px; /* << ลองปรับค่านี้ดูนะครับ */
+    overflow-y: auto;  /* ให้มี scrollbar แนวตั้งเมื่อเนื้อหาเกิน max-height */
+    border-top: 1px solid #97b8b462;
+
+}
+.room-list span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px; /* ปรับค่านี้ตามความเหมาะสม */
+
+}
+.room-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px; /* ปรับ padding เล็กน้อย */
+    /* เพิ่ม cursor pointer เพื่อให้ผู้ใช้รู้ว่าคลิกได้ */
+    cursor: pointer;
+    border-radius: 3px; /* ทำให้แต่ละรายการขอบมน */
+    margin: 2px 5px; /* เพิ่มระยะห่างระหว่างรายการเล็กน้อย */
+}
+
+.room-list li:hover {
+    background-color: #3a3c43; /* สีเมื่อเอาเมาส์ไปชี้ คล้าย Discord */
+}
+
+.room-list img {
+    width: 40px;  /* ปรับขนาดรูปให้ใหญ่ขึ้น */
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.room-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.room-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.room-list::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.room-list:hover::-webkit-scrollbar-track {
+    background: #2E3338;
+}
+
+.room-list:hover::-webkit-scrollbar-thumb {
+    background: #202225;
+}
+
+.room-list:hover::-webkit-scrollbar-thumb:hover {
+    background: #1A1B1E;
+}
+.profile-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-sizing: border-box; /* Ensure border doesn't push image size */
+    /* margin-right: 10px; -- Moved to .profile-image-wrapper */
+}
+
+.container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.search-box {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+input#searchRoom {
+    padding: 10px;
+    width: 80%;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    background: #5f8173;
+    color: #ceffea;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+.popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3); /* มืด */
+    backdrop-filter: blur(5px);     /* เบลอพื้นหลัง */
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 999; 
+    display: none;
+}
+
+.popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(70, 70, 70, 0.85); /* สีโปร่งใสสวยงาม */
+    border-radius: 8px;
+    padding: 20px;
+    width: 300px;
+    text-align: center;
+    z-index: 1000; /* อยู่บน overlay */
+    box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.3);
+}
+
+.popup-content {
+    position: relative;
+}
+
+.popup img {
+    width: 100%;
+    border-radius: 5px;
+}
+
+.popup h3 {
+    margin: 10px 0;
+}
+
+.join-btn {
+    background: green;
+    color: white;
+}
+
+.cancel-btn {
+    background: red;
+    color: white;
+}
+
+.close-btn {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+/* From Uiverse.io by alexruix */ 
+.group_search {
+    display: flex;
+    line-height: 28px;
+    align-items: center;
+    position: relative;
+    width: 100%; /* ทำให้มันเต็มความกว้างของ parent ที่มีอยู่ */
+    max-width: 400px; /* กำหนดความกว้างสูงสุดที่เหมาะสม */
+    /* ลบคุณสมบัติที่ขัดแย้งกันออก: max-width: 190px; และ width: 124%; */
+   }
+   
+   .input_search {
+    width: 100%; /* ทำให้มันเต็มความกว้างของ parent (group_search) */
+    /* ลบคุณสมบัติที่ขัดแย้งกันออก: width: 400%; */
+    height: 40px;
+    line-height: 28px;
+    padding: 0 1rem;
+    padding-left: 2.5rem;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    outline: none;
+    background-color: #464646;
+    color: #93ada4;
+    transition: .3s ease;
+    text-indent: 30px;
+   }
+   
+   .input_search::placeholder {
+    color: #93ada4;
+    text-indent: 30px;
+   }
+   
+   .input_search:focus, input:hover {
+    outline: none;
+    border-color: rgb(0, 255, 64);
+    background-color: #464646;
+    box-shadow: 0 0 0 4px rgba(89, 234, 76, 0.1);
+   }
+   
+   .icon_search {
+    position: absolute;
+    left: 1rem;
+    fill: #93ada4;
+    width: 1rem;
+    height: 1rem;
+    top: 50%; /* จัดกึ่งกลางแนวตั้งของไอคอน */
+    transform: translateY(-50%); /* ปรับตำแหน่งเพื่อจัดกึ่งกลางแนวตั้ง */
+   }
+   
+
+/*
+  Styles for the collapsible sidebar functionality.
+*/
+
+/* --- Container and Layout --- */
+#app-container {
+    display: flex;
+    height: 100vh;
+    overflow-x: hidden; /* Prevents horizontal scrollbar during transition */
+}
+
+/* --- Sidebar States --- */
+.sidebar {
+    transition: width 0.3s ease-in-out;
+    flex-shrink: 0; /* Prevent sidebar from shrinking when window is narrow */
+}
+
+.sidebar .sidebar-title-short {
+    display: none;
+}
+
+/* Collapsed State */
+#app-container.sidebar-collapsed .sidebar {
+    width: 75px; /* Width when collapsed */
+}
+
+#app-container.sidebar-collapsed .sidebar-title-full,
+#app-container.sidebar-collapsed .input_search,
+#app-container.sidebar-collapsed .room-list span {
+    display: none !important; /* ตรวจสอบให้แน่ใจว่ามี !important */
+}
+
+#app-container.sidebar-collapsed .sidebar-title-short {
+    display: inline;
+}
+
+#app-container.sidebar-collapsed .icon_VC {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    flex-direction: column;
+    align-items: center;
+}
+
+#app-container.sidebar-collapsed .icon_VC h3 {
+    font-size: 1.2em;
+    margin: 0;
+}
+
+#app-container.sidebar-collapsed .icon_VC button {
+    margin-top: 10px;
+}
+
+#app-container.sidebar-collapsed .group_search {
+    justify-content: center;
+}
+
+#app-container.sidebar-collapsed .room-list li {
+    justify-content: center;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+#app-container.sidebar-collapsed .room-list li img {
+    margin-right: 0;
+}
+
+/* จัดกึ่งกลางไอคอนค้นหาเมื่อ Sidebar ถูกพับเก็บและช่องค้นหาถูกซ่อน */
+#app-container.sidebar-collapsed .icon_search {
+    left: 50%; /* จัดกึ่งกลางแนวนอน */
+    transform: translate(-50%, -50%); /* รวมการจัดกึ่งกลางทั้งแนวนอนและแนวตั้ง */
+}
+
+/* --- Toggle Button --- */
+#sidebar-toggle {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 2000;
+    width: 40px;
+    height: 40px;
+    background-color: #40444b;
+    color: #dcddde;
+    border: none;
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease-in-out, background-color 0.2s;
+}
+
+#sidebar-toggle:hover {
+    background-color: #5c616a;
+    transform: scale(1.1);
+}
+
+#sidebar-toggle::before {
+    content: '‹'; /* Left-pointing angle bracket */
+}
+
+/* 
+ * ใช้ General Sibling Combinator (~) เพื่อเลือก #sidebar-toggle ที่เป็น sibling กับ #app-container
+ * ซึ่งจะทำงานได้ถูกต้องเมื่อ #sidebar-toggle อยู่นอก #app-container ใน HTML
+ */
+#app-container.sidebar-collapsed ~ #sidebar-toggle::before {
+    content: '›'; /* Right-pointing angle bracket */
+}
+
+/* --- สไตล์สำหรับสถานะออนไลน์/ออฟไลน์ --- */
+.online-user .profile-img {
+    border: 2px solid limegreen; /* ขอบสีเขียวสำหรับผู้ใช้ออนไลน์ */
+}
+
+.offline-user {
+    opacity: 0.6; /* ทำให้ผู้ใช้ออฟไลน์ดูจางลงเล็กน้อย */
+    /* หรือถ้าต้องการแค่ขอบบางๆ แทน opacity: */
+    /* .offline-user .profile-img { border: 1px solid rgba(147, 173, 164, 0.5); } */
+}
+/* --- สิ้นสุดสไตล์สำหรับสถานะออนไลน์/ออฟไลน์ --- */
+
+/* --- Profile Image Wrapper for Crown Positioning --- */
+.profile-image-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-right: 10px;
+    /* ทำให้ wrapper เป็นวงกลมและจัดตำแหน่งมงกุฎได้ดีขึ้น */
+    width: 40px;
+    height: 40px;
+}
+
+.profile-image-wrapper .profile-img {
+    /* ทำให้รูปภาพเต็ม wrapper */
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Crown Icon --- */
+.crown-icon {
+    position: absolute;
+    top: -5px; /* Adjust as needed */
+    right: -5px; /* Adjust as needed */
+    font-size: 16px; /* Size of the crown */
+    line-height: 1;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5); /* Add shadow for better visibility */
+    z-index: 2; /* ทำให้มงกุฎอยู่เหนือรูปและขอบ */
+    pointer-events: none; /* ทำให้มงกุฎไม่รบกวนการคลิก */
+}
+
+/* Hide crown by default (only show if role class is present) */
+.crown-icon::before {
+    content: '';
+}
+
+/* --- User Context Menu (Right-click) --- */
+/* The base styles are in popup2.css via .popup-menu */
+/* This is for specific overrides or additions */
+.user-context-specific-styles {
+    min-width: 180px;
+    z-index: 1100; /* Ensure it's above other popups */
+}
+
+.user-context-specific-styles li.menu-header {
+    font-weight: bold;
+    color: #ffffff;
+    background-color: #4a4e53;
+    padding: 10px 15px; /* Increased padding */
+    border-bottom: 1px solid #5c616a;
+    cursor: default;
+    font-size: 1.1em; /* Increased font size */
+}
+
+.user-context-specific-styles li.separator {
+    height: 1px;
+    background-color: #4a4e53;
+    padding: 0;
+    margin: 4px 0;
+    cursor: default;
+}
+
+.user-context-specific-styles li.danger-zone {
+    color: #dd6860;
+}
+
+.user-context-specific-styles li.danger-zone:hover {
+    background-color: #dd6860;
+    color: #ffffff;
+}
+
+/* --- Role & Crown Styles (Apply to .crown-icon) --- */
+.crown-icon.role-owner::before,
+.crown-icon.role-admin::before,
+.crown-icon.role-family::before {
+    content: '👑';
+}
+
+.crown-icon.role-owner::before  { color: #f53b57; } /* Red */
+.crown-icon.role-admin::before  { color: #ffd700; } /* Gold */
+.crown-icon.role-family::before { color: #3c91e6; } /* Blue */
+
+/* Default members (role-member) will not have a crown, so no specific ::before rule for them */
