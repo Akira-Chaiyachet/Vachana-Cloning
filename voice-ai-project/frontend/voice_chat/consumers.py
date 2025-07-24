@@ -37,6 +37,7 @@ class RoomConsumer(AsyncWebsocketConsumer):
                 }
             }
         )
+        await self.send_voice_members_to_self()
 
     async def disconnect(self, close_code):
         if not self.user.is_authenticated:
@@ -186,3 +187,27 @@ class RoomConsumer(AsyncWebsocketConsumer):
             "room_id": event["room_id"],
             "members": event["members"],
         }))
+    @database_sync_to_async
+    def get_voice_members(self):
+        # ดึง ID สมาชิก voice จาก Redis/Cache
+        key = f"voice:room:{self.room_id}:members"
+        member_ids = list(cache.get(key, set()))
+        # ดึงข้อมูล display จาก DB
+        users = CustomUser.objects.filter(id__in=member_ids)
+        return [
+            {
+                "userId": user.id,
+                "displayName": user.get_name_to_display(),
+                "avatarUrl": user.get_profile_image_url(),
+                "status": user.status,
+            }
+            for user in users
+        ]
+    async def send_voice_members_to_self(self):
+        members = await self.get_voice_members()
+        await self.send(text_data=json.dumps({
+            "type": "voice_member_update",
+            "room_id": self.room_id,
+            "members": members,
+        }))
+    

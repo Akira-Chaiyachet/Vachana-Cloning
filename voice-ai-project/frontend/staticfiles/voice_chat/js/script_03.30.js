@@ -421,6 +421,11 @@ function loadRoom(roomId, roomName, inviteCode) {
   document.getElementById("munublock").style.display = "block";
   console.log(`🔄 กำลังโหลดห้อง: ${roomName} (${roomId})`);
 
+  // [ADD] เชื่อมต่อ WebSocket สำหรับห้องใหม่ทุกครั้งที่โหลดห้อง
+  if (typeof connectWebSocket === "function") {
+    connectWebSocket(roomId);
+  }
+
   loadMessages(roomId);
   loadRoomMembers();
   if (typeof renderVoiceJoinLeaveButton === "function")
@@ -430,8 +435,14 @@ function loadRoom(roomId, roomName, inviteCode) {
   if (rtcIsJoined && rtcActiveRoomId === roomId) {
     // กำลัง join voice ในห้องนี้ → ต้อง reconnect RTC signaling WS
     connectRTCSignalingWS(roomId);
-    if (typeof renderVoiceJoinLeaveButton === "function")
+    if (typeof renderVoiceJoinLeaveButton === "function") {
       renderVoiceJoinLeaveButton();
+    }
+    // อัพเดทรายชื่อผู้ใช้ในห้องเสียง
+    if (typeof updateVoiceMembersUI === "function") {
+      // ส่ง empty array เพื่อ reset UI ก่อน - members จริงจะมาจาก voice_member_update event
+      updateVoiceMembersUI([], roomId);
+    }
   } else {
     clearVoiceRoomUIOnRoomSwitch();
   }
