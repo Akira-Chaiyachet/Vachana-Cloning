@@ -1,4 +1,7 @@
-let socket = null; // เก็บ WebSocket ไว้ใช้ทั่วไฟล์
+window.socket = null; // ใช้ global เดียวเท่านั้น
+window.RTCVoiceChannels = {}; // { channelId: RTCVoice instance }
+window.activeVoiceChannelId = null; // ช่องที่ user join ล่าสุด
+window.isJoiningVoice = false;
 let preventMenuToggle = true;
 let heartbeatInterval = null; // สำหรับเก็บ interval ของ heartbeat
 
@@ -10,6 +13,10 @@ let allMembersData = []; // เก็บข้อมูลสมาชิกท�
 function connectWebSocket(roomId) {
   // 1. ถ้ามี socket เก่าอยู่ ให้ปิดการเชื่อมต่อและล้าง event handlers
   // เพื่อป้องกันการเชื่อมต่อซ้ำซ้อน หรือการที่ onclose ของเก่าทำงาน
+  if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+    console.log("WS already connected, skip.");
+    return;
+  }
   if (socket) {
     console.log("🔌 ปิดการเชื่อมต่อ WebSocket เก่า...");
     socket.onclose = null; // ป้องกันไม่ให้ onclose ของเก่าพยายาม reconnect
@@ -44,9 +51,42 @@ function connectWebSocket(roomId) {
 
   socket.onmessage = function (event) {
     let data = JSON.parse(event.data);
-    console.log("📩 ได้รับข้อมูลจาก WebSocket:", data);
 
-    // --- VVV จัดการ event ที่ได้รับจาก WebSocket VVV ---
+    // --- [NEW] จัดการ WebRTC signaling (action) ---
+    if (
+      data.action &&
+      ["offer", "answer", "ice_candidate"].includes(data.action)
+    ) {
+      if (
+        window.RTCVoice &&
+        typeof window.RTCVoice.handleSignalingMessage === "function"
+      ) {
+        window.RTCVoice.handleSignalingMessage(data);
+      }
+      return; // ไม่ต้องทำ logic อื่น
+    }
+    if (data.action === "voice_update") {
+      updateVoiceMembersUI(data.voice_members || []);
+      return;
+    }
+    if (["offer", "answer", "ice_candidate"].includes(data.action)) {
+      RTCVoice.handleSignalingMessage(data);
+    }
+    // == เพิ่มตรงนี้ ==
+    if (data.type === "voice_update") {
+      updateVoiceMembersUI(data.voice_members || []);
+    }
+    // เดิม...
+    if (
+      typeof oldHandler === "function" &&
+      !["offer", "answer", "ice_candidate"].includes(data.action)
+    ) {
+      oldHandler(event);
+    }
+    if (data.type === "voice_update") {
+      updateVoiceMembersUI(data.voice_members || []);
+    }
+    // --- [ORIGINAL LOGIC] สำหรับ event อื่นๆ (type) ---
     switch (data.type) {
       case "user_join":
         console.log(
@@ -88,13 +128,14 @@ function connectWebSocket(roomId) {
         break;
       case "chat_message":
         // เพิ่มโค้ดนี้เพื่อแสดงข้อความใหม่ในช่องแชท
-        const chatMessages = document.getElementById('chatMessages');
+        const chatMessages = document.getElementById("chatMessages");
         if (chatMessages && typeof renderMessage === "function") {
           const el = renderMessage(data.message);
           chatMessages.appendChild(el);
           chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         break;
+      // --- เพิ่ม case อื่นๆ ที่ระบบห้องใช้งาน ได้ที่นี่ ---
     }
     // --- ^^^ สิ้นสุดการจัดการ event ^^^ ---
   };
@@ -107,7 +148,9 @@ function connectWebSocket(roomId) {
       heartbeatInterval = null;
       console.log("🛑 Heartbeat หยุดทำงานเนื่องจาก WebSocket ปิด");
     }
-    // --- ^^^ สิ้นสุดการเพิ่ม ^^^ --- 
+    const joinBtn = document.getElementById("joinVoiceBtn");
+    if (joinBtn) joinBtn.disabled = false; // เปิดให้ joinVoice ได้
+    // --- ^^^ สิ้นสุดการเพิ่ม ^^^ ---
     // การ reconnect อัตโนมัติอาจทำให้เกิดการเชื่อมต่อซ้อนกันเมื่อผู้ใช้เปลี่ยนห้อง
     // การเชื่อมต่อควรถูกจัดการโดย loadRoom() เท่านั้นเพื่อความแน่นอน
     // setTimeout(() => connectWebSocket(roomId), 3000); // เอาออกชั่วคราวเพื่อแก้ปัญหาข้อความซ้ำ
@@ -636,6 +679,12 @@ function hideAllPopups() {
 
 function disconnectRoom() {
   preventMenuToggle = true;
+
+  // >>> หยุดการเชื่อมต่อ Voice Chat <<<
+  if (window.stopVoiceChat) {
+    console.log("🎤 Stopping voice chat before disconnecting room...");
+    window.stopVoiceChat();
+  }
   // ✅ ลบข้อมูลห้องที่ถูกบันทึกไว้
   localStorage.removeItem("currentRoomId");
   localStorage.removeItem("currentRoomName");
@@ -737,11 +786,18 @@ function setUserStatus(status) {
     });
 
   // --- ปรับ logic: invisible = แค่ส่ง set_status, ไม่ต้องปิด socket ---
-  if (typeof socket !== "undefined" && socket && socket.readyState === WebSocket.OPEN) {
+  if (
+    typeof socket !== "undefined" &&
+    socket &&
+    socket.readyState === WebSocket.OPEN
+  ) {
     socket.send(JSON.stringify({ action: "set_status", status: status }));
   }
   // ถ้าเปลี่ยนจาก invisible → online/dnd และ socket ไม่ได้เชื่อมต่อ ให้ connect ใหม่
-  if ((status === "online" || status === "dnd") && (!socket || socket.readyState !== WebSocket.OPEN)) {
+  if (
+    (status === "online" || status === "dnd") &&
+    (!socket || socket.readyState !== WebSocket.OPEN)
+  ) {
     let roomId = localStorage.getItem("currentRoomId");
     if (roomId) {
       connectWebSocket(roomId);

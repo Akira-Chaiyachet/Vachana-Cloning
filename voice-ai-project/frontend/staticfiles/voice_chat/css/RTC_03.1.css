@@ -1,0 +1,114 @@
+/* RTC_03.1.css */
+
+/* Main container for the voice room UI */
+.voice-room {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: #2f3136; /* Slightly darker than chat for separation */
+    color: #dcddde;
+    box-sizing: border-box;
+    position: relative; /* Needed for absolute positioning of controls */
+}
+
+/* Container for the list of members in the voice channel */
+.voice-channel-members {
+    flex-grow: 1; /* Takes up all available space */
+    overflow-y: auto; /* Add scrollbar if members overflow */
+    padding: 10px 10px 80px 10px; /* Add padding at the bottom to avoid overlap with controls */
+}
+
+/* Styling for each individual member in the voice channel */
+.voice-member {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+
+.voice-member:hover {
+    background-color: #3a3d42;
+}
+
+/* Avatar image of the voice member */
+.voice-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 12px;
+    object-fit: cover;
+    border: 2px solid transparent; /* For speaking indicator */
+    transition: border-color 0.1s ease-in-out;
+}
+
+/* Speaking indicator - green border around avatar */
+.voice-member.speaking .voice-avatar {
+    border-color: #43b581; /* Green color for speaking */
+    box-shadow: 0 0 8px #43b581;
+}
+
+/* Username of the voice member */
+.voice-username {
+    font-weight: 500;
+    flex-grow: 1;
+}
+
+/* Container for the bottom voice controls */
+.voice-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: #292b2f; /* Even darker for the control bar */
+    border-top: 1px solid #232428;
+    flex-shrink: 0; /* Prevents the control bar from shrinking */
+    height: 65px; /* Fixed height */
+    box-sizing: border-box;
+}
+
+/* Connection status section (left side) */
+.connection-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+#voice-status-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    display: inline-block;
+}
+
+/* Different states for the connection icon */
+.icon-connected { background-color: #43b581; } /* Green */
+.icon-connecting { background-color: #faa61a; animation: pulse 1.5s infinite; } /* Yellow */
+.icon-disconnected { background-color: #f04747; } /* Red */
+
+#voice-status-text {
+    font-weight: bold;
+    color: #43b581; /* Default to green */
+}
+
+/* Action buttons section (right side) */
+.action-buttons { display: flex; gap: 10px; }
+.action-buttons button { background-color: #40444b; border: none; color: #dcddde; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2em; transition: background-color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+.action-buttons button:hover { background-color: #5c616a; }
+.action-buttons button.active { background-color: #7289da; color: white; }
+.action-buttons button.disconnect { background-color: #f04747; }
+.action-buttons button.disconnect:hover { background-color: #d84040; }
+
+/* Animation for connecting status */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(250, 166, 26, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(250, 166, 26, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(250, 166, 26, 0); }
+}
+

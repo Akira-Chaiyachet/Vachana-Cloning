@@ -1,55 +1,37 @@
+# consumers_refactor_v1.py
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer # type: ignore
-from channels.db import database_sync_to_async # Import เพื่อใช้ ORM ใน async function
-from django.utils import timezone # Import timezone
-from django.core.cache import cache  # <--- เพิ่มบรรทัดนี้เพื่อ import cache
+from channels.generic.websocket import AsyncWebsocketConsumer  # type: ignore
+from channels.db import database_sync_to_async
+from django.utils import timezone
+from django.core.cache import cache
 from users.models import CustomUser
-from .models import Room, RoomParticipant # ✅ เพิ่มการ import ที่จำเป็น
+from .models import Room, RoomParticipant
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        """ เรียกใช้เมื่อผู้ใช้เชื่อมต่อ WebSocket """
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         self.room_group_name = f"room_{self.room_id}"
-        self.user = self.scope["user"]  # เก็บ user object
+        self.user = self.scope["user"]
 
-        # 1. ตรวจสอบว่าผู้ใช้ล็อกอินหรือยัง
-        if not self.user.is_authenticated:
+        # 1. Check authentication & membership
+        if not self.user.is_authenticated or not await self.is_user_member():
             await self.close()
             return
 
-        # 2. ตรวจสอบว่าผู้ใช้เป็นสมาชิกของห้องนี้หรือไม่ (เพื่อความปลอดภัย)
-        if not await self.is_user_member():
-            await self.close()
-            return
-
-        # 3. เข้าร่วมกลุ่ม WebSocket
+        # 2. Add to channel group & accept connection
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-
-        # --- Track การเชื่อมต่อของ user ใน Redis/Cache ---
         await self.add_user_channel()
 
+        # 3. Set user status & online
+        await self._set_online_status_on_connect()
 
-        # 4. อัปเดตสถานะออนไลน์ของผู้ใช้ (online/dnd/invisible)
-        # ถ้า user เคยเลือก dnd ให้คง dnd, ถ้า invisible ให้คง invisible, ถ้าไม่ให้เป็น online
-        if self.user.status == "dnd":
-            await self.set_user_status("dnd")
-            await self.update_user_online_status(is_online=True)
-        elif self.user.status == "invisible":
-            # ไม่ต้อง set_user_status ใหม่, แค่ update last_online เพื่อกัน timeout
-            await self.update_user_online_status(is_online=True)
-        else:
-            await self.set_user_status("online")
-            await self.update_user_online_status(is_online=True)
-
-        # 5. แจ้งทุกคนในห้องว่ามีผู้ใช้ใหม่ "เข้าร่วม" (Join)
-        #    นี่คือส่วนสำคัญที่แก้ไขปัญหาหลัก
+        # 4. Broadcast join event
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                "type": "user_join", # <-- เปลี่ยนเป็น user_join ให้ตรงกับ JS
-                "user": { # ส่งข้อมูลผู้ใช้ไปด้วยเผื่อใช้ในอนาคต
+                "type": "user_join",
+                "user": {
                     "id": self.user.id,
                     "display_name": self.user.get_name_to_display(),
                 }
@@ -57,64 +39,61 @@ class RoomConsumer(AsyncWebsocketConsumer):
         )
 
     async def disconnect(self, close_code):
-        """ เรียกใช้เมื่อผู้ใช้ตัดการเชื่อมต่อ """
-        if self.user.is_authenticated:
-            print(f"❌ {self.user.username} ออกจากห้อง {self.room_group_name}")
-
-            # --- ลบ channel_name ออกจาก Redis/Cache ---
-            await self.remove_user_channel()
-
-            # --- Delay ก่อน set สถานะ invisible เพื่อป้องกัน refresh/reconnect กลายเป็นล่องหน ---
-            import asyncio
-            await asyncio.sleep(5)  # รอ 5 วินาที
-            # เช็คว่าผู้ใช้ยัง connect อยู่หรือไม่ (เช่น มี session อื่นในห้องนี้)
-            # ถ้าไม่มีการ connect ใหม่ใน 5 วินาที ค่อย set เป็น invisible
-            still_connected = await self.is_user_member() and await self.is_user_still_connected()
-
-            if not still_connected:
-                await self.set_user_status("invisible")
-                await self.update_user_online_status(is_online=False)
-
-                # แจ้งทุกคนในห้องว่ามีผู้ใช้ "ออกจากห้อง" (Leave)
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "user_status",  # broadcast สถานะใหม่ทันที (userlist frontend จะ sync)
-                        "user_id": self.user.id,
-                        "status": "invisible",
-                    }
-                )
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "user_leave",
-                        "user": {
-                            "id": self.user.id,
-                            "display_name": self.user.get_name_to_display(),
-                        }
-                    }
-                )
-
-            # ออกจากกลุ่ม WebSocket (สำคัญมาก)
-            await self.channel_layer.group_discard(
+        if not self.user.is_authenticated:
+            return
+        await self.remove_user_channel()
+        # Delay for concurrent connections check
+        import asyncio
+        await asyncio.sleep(3)
+        still_connected = await self.is_user_member() and await self.is_user_still_connected()
+        if not still_connected:
+            await self.set_user_status("invisible")
+            await self.update_user_online_status(is_online=False)
+            # Broadcast invisible & leave
+            await self.channel_layer.group_send(
                 self.room_group_name,
-                self.channel_name
+                {
+                    "type": "user_status",
+                    "user_id": self.user.id,
+                    "status": "invisible",
+                }
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "user_leave",
+                    "user": {
+                        "id": self.user.id,
+                        "display_name": self.user.get_name_to_display(),
+                    }
+                }
             )
 
-    # --- Redis/Cache-based user channel tracking ---
-    from django.core.cache import cache
+    # --- Status/Presence Logic ---
+    async def _set_online_status_on_connect(self):
+        if self.user.status == "dnd":
+            await self.set_user_status("dnd")
+            await self.update_user_online_status(is_online=True)
+        elif self.user.status == "invisible":
+            await self.update_user_online_status(is_online=True)
+        else:
+            await self.set_user_status("online")
+            await self.update_user_online_status(is_online=True)
 
+    # --- Redis/Cache-based user channel tracking ---
     @database_sync_to_async
     def add_user_channel(self):
         key = f"user:{self.user.id}:room:{self.room_id}:channels"
         channels = cache.get(key, set())
+        channels = set(channels)  # Always ensure set type
         channels.add(self.channel_name)
-        cache.set(key, channels, timeout=60*10)  # 10 นาที
+        cache.set(key, channels, timeout=60*10)
 
     @database_sync_to_async
     def remove_user_channel(self):
         key = f"user:{self.user.id}:room:{self.room_id}:channels"
         channels = cache.get(key, set())
+        channels = set(channels)
         channels.discard(self.channel_name)
         cache.set(key, channels, timeout=60*10)
         return len(channels)
@@ -123,23 +102,31 @@ class RoomConsumer(AsyncWebsocketConsumer):
     def is_user_still_connected(self):
         key = f"user:{self.user.id}:room:{self.room_id}:channels"
         channels = cache.get(key, set())
+        channels = set(channels)
         return len(channels) > 0
 
+    # --- Core Data Actions ---
     async def receive(self, text_data):
-        """ เมื่อได้รับข้อความจาก Client """
-        data = json.loads(text_data)
+        try:
+            data = json.loads(text_data)
+        except Exception as e:
+            await self.send(json.dumps({"error": "Invalid JSON"}))
+            return
         action = data.get("action")
 
-        # อัปเดต last_online เมื่อผู้ใช้ยัง active (ส่ง heartbeat)
-        if self.user.is_authenticated and action == "heartbeat":
-            await self.update_user_online_status(is_online=True)
+        if not self.user.is_authenticated:
+            await self.close()
+            return
 
-        # --- เพิ่มรองรับการเปลี่ยนสถานะ realtime ผ่าน WebSocket ---
-        if self.user.is_authenticated and action == "set_status":
+        # Heartbeat (keepalive)
+        if action == "heartbeat":
+            await self.update_user_online_status(is_online=True)
+            return
+        # Set status
+        if action == "set_status":
             new_status = data.get("status")
             if new_status in dict(CustomUser.STATUS_CHOICES):
                 await self.set_user_status(new_status)
-                # Broadcast ไปยังสมาชิกในห้องนี้ทันที
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
@@ -148,13 +135,14 @@ class RoomConsumer(AsyncWebsocketConsumer):
                         'status': new_status,
                     }
                 )
+            return
+        # Add more action handlers as needed
+        # Example: "send_message", etc.
 
     @database_sync_to_async
     def set_user_status(self, status):
         self.user.status = status
         self.user.save(update_fields=['status'])
-
-    # --- Database Helper Functions ---
 
     @database_sync_to_async
     def is_user_member(self):
@@ -163,49 +151,38 @@ class RoomConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def update_user_online_status(self, is_online: bool):
         if is_online:
-            # อัปเดตเวลาล่าสุดที่ออนไลน์ เพื่อให้ is_online() คืนค่า True
             self.user.last_online = timezone.now()
             self.user.save(update_fields=['last_online'])
-        # ถ้า is_online=False เราไม่ต้องทำอะไร ปล่อยให้ last_online เก่าไปเอง
 
-    # --- Event Handlers (จาก Group ส่งไปยัง Client) ---
-
+    # --- Broadcast Event Handlers ---
     async def user_join(self, event):
-        """ ส่ง event 'user_join' ที่ได้รับจาก group ไปยัง client แต่ละคน """
         await self.send(text_data=json.dumps(event))
-
     async def user_leave(self, event):
-        """ ส่ง event 'user_leave' ที่ได้รับจาก group ไปยัง client แต่ละคน """
         await self.send(text_data=json.dumps(event))
-
     async def update_members(self, event):
-        """ จัดการ event ที่ถูกส่งมาจาก view (เช่น ตอน join/leave ผ่าน API) """
         await self.send(text_data=json.dumps({"type": "refresh_members"}))
-
-
     async def profile_updated(self, event):
-        """ ส่ง event 'profile_updated' ที่ได้รับจาก group ไปยัง client """
         await self.send(text_data=json.dumps(event))
-
     async def user_status(self, event):
-        """ ส่ง event 'user_status' ที่ได้รับจาก group ไปยัง client (JS) """
         await self.send(text_data=json.dumps({
             'type': 'user_status',
             'user_id': event['user_id'],
             'status': event['status'],
         }))
-
     async def role_changed(self, event):
-        """ จัดการ event 'role_changed' จาก view และส่ง 'role_update' ไปยัง JS """
         await self.send(text_data=json.dumps({
             'type': 'role_update',
             'user_id': event['user_id'],
             'new_role': event['new_role'],
         }))
-
     async def chat_message(self, event):
-        """ ส่ง event 'chat_message' ที่ได้รับจาก group ไปยัง client แต่ละคน """
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': event['message'],
+        }))
+    async def voice_member_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "voice_member_update",
+            "room_id": event["room_id"],
+            "members": event["members"],
         }))

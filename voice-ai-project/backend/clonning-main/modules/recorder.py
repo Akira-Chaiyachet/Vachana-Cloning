@@ -2,23 +2,18 @@
 import sounddevice as sd
 import numpy as np
 import scipy.io.wavfile as wav
+import tempfile
 import os
-import datetime
 
 def record_audio(duration=5, fs=16000):
     print("🎤 เริ่มบันทึกเสียง...")
-
     audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
     sd.wait()
 
-    # ตั้งชื่อไฟล์ตามเวลา
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"voices/recording_{timestamp}.wav"
-    
-    # ตรวจสอบว่าโฟลเดอร์ voices มีหรือยัง
-    os.makedirs("voices", exist_ok=True)
+    # ใช้ tempfile เพื่อบันทึกเสียงในหน่วยความจำ
+    temp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    wav.write(temp_wav.name, fs, audio)
 
-    # บันทึกไฟล์เสียง
-    wav.write(filename, fs, audio)
-    print(f"✅ บันทึกเสร็จ: {filename}")
-    return filename
+    print(f"✅ บันทึกเสร็จ (ชั่วคราว): {temp_wav.name}")
+    print(f"ขนาดไฟล์เสียง: {os.path.getsize(temp_wav.name)} bytes")
+    return temp_wav.name

@@ -1,15 +1,9 @@
-import whisper, torch, os
-
-ffmpeg_path = os.path.abspath(r"C:\project\voice-translator\ffmpeg-7.1.1-essentials_build\bin")
-os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"🖥️ กำลังใช้ device: {device}")
-
-model = whisper.load_model("large").to("cuda")
-
-def transcribe_audio(audio_path):
-    print("🧠 กำลังแปลงเสียงเป็นข้อความ...")
+def transcribe_audio(audio_path, model):
+    print("🧠 แปลงเสียงเป็นข้อความ...")
+    # Force model to use GPU if available
+    import torch
+    if hasattr(model, 'to') and torch.cuda.is_available():
+        model = model.to('cuda')
     result = model.transcribe(audio_path, task="transcribe", language="th")
-    print("📄 ข้อความที่ได้:", result["text"])
+    print("[DEBUG] result:", result)
     return result["text"]

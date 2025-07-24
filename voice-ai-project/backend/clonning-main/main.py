@@ -1,45 +1,53 @@
-import os
-import torch
+# ใน main.py
 
 
 
-# กำหนด path ของ ffmpeg ที่อยู่ในโปรเจกต์
-ffmpeg_path = os.path.abspath(r"C:\project\voice-translator\ffmpeg-7.1.1-essentials_build\bin")
-os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
 
-# main.py
 
-from modules.tts_xtts import speak_with_xtts
+
+from modules.tts_xtts import load_xtts_model, speak_with_xtts
 from modules.recorder import record_audio
 from modules.stt import transcribe_audio
-from modules.translator_m2m100 import translator_m2m100
-from modules.tts_xtts import speak_with_xtts, load_xtts_model
+from modules.translator_m2m100 import translator_m2m100_init
+import torch
+import whisper
+
+def load_whisper_model(model_name="large", device="cuda"):
+    print(f"🚀 กำลังโหลดโมเดล Whisper ({model_name})...")
+    model = whisper.load_model(model_name)
+    if device:
+        import torch
+        if torch.cuda.is_available() and device == "cuda":
+            model = model.to("cuda")
+    print("✅ โหลดโมเดล Whisper เสร็จแล้ว!")
+    return model
 
 
 if __name__ == "__main__":
-    try:
+    whisper_model = load_whisper_model("large", "cuda")
+    xtts_model = load_xtts_model()
+    translator = translator_m2m100_init()
+
+    while True:
         audio_path = record_audio(duration=5)
-        text_thai = transcribe_audio(audio_path)
-        
 
-        text_en = translator_m2m100(text_thai, source_lang="thai", target_lang="english")
-        torch.cuda.empty_cache()
-        text_ja = translator_m2m100(text_thai, source_lang="thai", target_lang="japanese")
-        torch.cuda.empty_cache()
-        text_zh = translator_m2m100(text_thai, source_lang="thai", target_lang="chinese")
-        torch.cuda.empty_cache()
-        print("\n📝 ข้อความต้นฉบับ (ไทย):", text_thai)
-        print("🌍 แปลเป็นอังกฤษ:", text_en)
-        print("🌸 แปลเป็นญี่ปุ่น:", text_ja)
-        print("🐉 แปลเป็นจีน:", text_zh)
+        try:
+            text_thai = transcribe_audio(audio_path, whisper_model)
+            if not text_thai.strip():
+                continue
 
-        speak_with_xtts(load_xtts_model(), text_en, audio_path, lang="en", output_path="outputs/voice_en.wav")
-        speak_with_xtts(load_xtts_model(), text_ja, audio_path, lang="ja", output_path="outputs/voice_ja.wav")
-        speak_with_xtts(load_xtts_model(), text_zh, audio_path, lang="zh", output_path="outputs/voice_zh.wav")
+            text_en = translator(text_thai, "thai", "english")
+            text_ja = translator(text_thai, "thai", "japanese")
+            text_zh = translator(text_thai, "thai", "chinese")
 
-       
+            print("📝:", text_thai)
+            print("🌍:", text_en)
 
+            speak_with_xtts(xtts_model, text_en, audio_path, "en")
+            speak_with_xtts(xtts_model, text_ja, audio_path, "ja")
+            speak_with_xtts(xtts_model, text_zh, audio_path, "zh")
 
-    except Exception as e:
-        print("เกิดข้อผิดพลาด:", e)
+        except Exception as e:
+            print("❌ ERROR:", e)
+

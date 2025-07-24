@@ -636,6 +636,12 @@ function hideAllPopups() {
 
 function disconnectRoom() {
   preventMenuToggle = true;
+
+  // >>> หยุดการเชื่อมต่อ Voice Chat <<<
+  if (window.stopVoiceChat) {
+    console.log('🎤 Stopping voice chat before disconnecting room...');
+    window.stopVoiceChat();
+  }
   // ✅ ลบข้อมูลห้องที่ถูกบันทึกไว้
   localStorage.removeItem("currentRoomId");
   localStorage.removeItem("currentRoomName");
