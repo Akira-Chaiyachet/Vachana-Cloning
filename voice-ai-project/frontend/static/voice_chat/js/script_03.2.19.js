@@ -101,6 +101,7 @@ function connectWebSocket(roomId) {
         console.log("WS: voice_member_update", data);
         // ปรับปรุงเงื่อนไขให้รัดกุมขึ้น โดยแปลงทั้งสองค่าเป็น String ก่อนเปรียบเทียบ
         if (String(data.room_id) === String(window.currentChatRoomId)) {
+          onVoiceMemberUpdate(data.members);
           updateVoiceMembersUI(data.members, data.room_id);
         }
         break;

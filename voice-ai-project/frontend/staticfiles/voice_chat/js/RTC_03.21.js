@@ -122,6 +122,9 @@ function connectRTCSignalingWS(roomId) {
         // ใช้ rtcActiveRoomId ถ้าไม่มี room_id จาก server
         updateVoiceMembersUI(data.members, data.room_id || rtcActiveRoomId);
       }
+      if (["offer", "answer", "ice"].includes(data.type)) {
+        handleRTCSignalingMessage(data);
+      }
       // TODO: RTC peer logic...
     },
     onclose: (e, ws, retry, interval) => {
@@ -183,12 +186,21 @@ function leaveVoiceRoom(roomId) {
   if (statusText) statusText.textContent = "ออกจากห้องเสียงแล้ว";
 }
 function updateVoiceMembersUI(members, roomId = null) {
-  console.log("[updateVoiceMembersUI] members=", members, "roomId=", roomId, "window.currentChatRoomId=", window.currentChatRoomId);
-  
+  console.log(
+    "[updateVoiceMembersUI] members=",
+    members,
+    "roomId=",
+    roomId,
+    "window.currentChatRoomId=",
+    window.currentChatRoomId
+  );
+
   // ถ้า roomId ไม่ตรงกับห้องปัจจุบัน ให้ข้าม
   // ใช้ window.currentChatRoomId ซึ่งเป็น ID ของห้องที่กำลังดูอยู่เป็นตัวเปรียบเทียบ
   if (roomId && String(roomId) !== String(window.currentChatRoomId)) {
-    console.log(`Skip updateVoiceMembersUI: different room. Event for ${roomId}, currently in ${window.currentChatRoomId}`);
+    console.log(
+      `Skip updateVoiceMembersUI: different room. Event for ${roomId}, currently in ${window.currentChatRoomId}`
+    );
     return;
   }
 
@@ -219,7 +231,6 @@ function updateVoiceMembersUI(members, roomId = null) {
             </div>`;
   });
 }
-
 
 window.joinVoiceRoom = joinVoiceRoom;
 window.leaveVoiceRoom = leaveVoiceRoom;
@@ -266,4 +277,153 @@ function clearVoiceRoomUIOnRoomSwitch() {
   renderVoiceJoinLeaveButton();
   const statusText = document.getElementById("voice-status-text");
   if (statusText) statusText.textContent = "ยังไม่ได้เชื่อมต่อห้องเสียง";
+}
+window.myRTCUserId = window.currentUserId;
+
+function onVoiceMemberUpdate(members) {
+  const myId = String(window.myRTCUserId);
+
+  members.forEach((member) => {
+    const peerId = String(member.userId);
+    if (peerId === myId) return; // ข้ามตัวเอง
+
+    // ถ้ายังไม่มี peerConnection กับคนนี้
+    if (!rtcPeerConnections[peerId]) {
+      createPeerConnectionForPeer(peerId);
+
+      // “initiator” คือ user id น้อยกว่า
+      if (myId < peerId) {
+        initiateOffer(peerId);
+      }
+    }
+  });
+
+  // cleanup: ถ้า peer ออกจากห้อง
+  Object.keys(rtcPeerConnections).forEach((peerId) => {
+    if (!members.some((m) => String(m.userId) === peerId)) {
+      rtcPeerConnections[peerId].close();
+      delete rtcPeerConnections[peerId];
+      removeAudioElement(peerId);
+    }
+  });
+}
+function createPeerConnectionForPeer(peerId) {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }], // ฟรี STUN server
+  });
+
+  // ผูกเสียงตัวเอง (localStream อาจจะ null ตอนแรก)
+  if (rtcLocalStream) {
+    rtcLocalStream
+      .getTracks()
+      .forEach((track) => pc.addTrack(track, rtcLocalStream));
+  }
+
+  // เมื่อได้ remote track
+  pc.ontrack = (event) => {
+    attachRemoteAudio(event.streams[0], peerId);
+  };
+
+  // ส่ง candidate
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      sendSignalingMessage("ice", peerId, event.candidate);
+    }
+  };
+
+  rtcPeerConnections[peerId] = pc;
+}
+function sendSignalingMessage(type, targetPeerId, data) {
+  if (!rtcSignalingWSHandler) return;
+  const message = {
+    type: type, // "offer" | "answer" | "ice"
+    from: window.myRTCUserId,
+    target: targetPeerId,
+    data: data,
+  };
+  rtcSignalingWSHandler.send(JSON.stringify(message));
+}
+function handleRTCSignalingMessage(data) {
+  const myId = String(window.myRTCUserId);
+  // ให้ message เฉพาะที่ “target” ถึงเราเท่านั้น
+  if (!data.target || String(data.target) !== myId) return;
+
+  const peerId = String(data.from);
+
+  switch (data.type) {
+    case "offer":
+      onReceivedOffer(peerId, data.data);
+      break;
+    case "answer":
+      onReceivedAnswer(peerId, data.data);
+      break;
+    case "ice":
+      onReceivedICE(peerId, data.data);
+      break;
+  }
+}
+// ผู้เริ่ม initiate
+async function initiateOffer(peerId) {
+  const pc = rtcPeerConnections[peerId];
+  if (!pc) return;
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  sendSignalingMessage("offer", peerId, offer);
+}
+
+// ฝั่ง receiver
+async function onReceivedOffer(peerId, offer) {
+  let pc = rtcPeerConnections[peerId];
+  if (!pc) {
+    createPeerConnectionForPeer(peerId);
+    pc = rtcPeerConnections[peerId];
+  }
+  await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  sendSignalingMessage("answer", peerId, answer);
+}
+
+async function onReceivedAnswer(peerId, answer) {
+  const pc = rtcPeerConnections[peerId];
+  if (!pc) return;
+  await pc.setRemoteDescription(new RTCSessionDescription(answer));
+}
+
+async function onReceivedICE(peerId, candidate) {
+  const pc = rtcPeerConnections[peerId];
+  if (!pc) return;
+  if (candidate) {
+    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  }
+}
+function attachRemoteAudio(remoteStream, peerId) {
+  let audio = document.getElementById(`voice-audio-${peerId}`);
+  if (!audio) {
+    audio = document.createElement('audio');
+    audio.id = `voice-audio-${peerId}`;
+    audio.autoplay = true;
+    audio.controls = false;
+    audio.style.display = "none"; // หรือเปิด controls สำหรับ debug
+    document.body.appendChild(audio); // หรือใน DOM เฉพาะส่วน voice room
+  }
+  audio.srcObject = remoteStream;
+}
+
+function removeAudioElement(peerId) {
+  const audio = document.getElementById(`voice-audio-${peerId}`);
+  if (audio) audio.remove();
+}
+// เมื่อเราได้ rtcLocalStream ใหม่ หลัง join
+function ensureTrackForAllPeers() {
+  if (!rtcLocalStream) return;
+  Object.values(rtcPeerConnections).forEach(pc => {
+    // เช็คก่อนว่า track นี้ถูก add ไปหรือยัง (ป้องกันซ้ำ)
+    const senders = pc.getSenders();
+    rtcLocalStream.getTracks().forEach(track => {
+      if (!senders.find(s => s.track && s.track.id === track.id)) {
+        pc.addTrack(track, rtcLocalStream);
+      }
+    });
+  });
 }
