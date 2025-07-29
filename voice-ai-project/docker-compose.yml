@@ -7,7 +7,6 @@ services:
       dockerfile: Dockerfile
     command: >
       sh -c "until mysqladmin ping -h db --silent; do sleep 5; done &&
-            #  python manage.py makemigrations &&
              python manage.py migrate &&
              python manage.py collectstatic --noinput &&
              python manage.py runserver 0.0.0.0:8000"
@@ -18,7 +17,7 @@ services:
       - "8000:8000"
     depends_on:
       db:
-        condition: service_healthy  # ✅ ให้ Django รอจนกว่า MySQL จะพร้อม
+        condition: service_healthy
       redis:
         condition: service_started
     environment:
@@ -26,6 +25,21 @@ services:
       - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./frontend/staticfiles:/app/frontend/staticfiles  # สำคัญ!
+      - ./frontend/media:/app/frontend/media
+      - ./frontend/dist:/app/frontend/dist            # <--- เพิ่มบรรทัดนี้!
+    depends_on:
+      - web
 
   db:
     image: mysql:8.0

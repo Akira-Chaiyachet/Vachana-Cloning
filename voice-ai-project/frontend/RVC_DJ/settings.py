@@ -90,7 +90,13 @@ LOGOUT_REDIRECT_URL = "/users/login/"
 
 # ✅ Security
 DEBUG = True
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "10.225.220.129",
+    "172.28.190.185",
+    "*",  # ถ้าต้องการเปิดกว้างจริงๆ แต่ไม่แนะนำสำหรับ production
+]
 CSRF_TRUSTED_ORIGINS = ["http://localhost:8000"]
 
 # ✅ Email Backend
@@ -103,15 +109,17 @@ AUTH_USER_MODEL = "users.CustomUser"
 SESSION_COOKIE_AGE = 86400  # 24 ชั่วโมง
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # ✅ ให้ session คงอยู่แม้ปิด browser
 SESSION_SAVE_EVERY_REQUEST = True  # ✅ ต่ออายุ session ทุก request
-
-# อนุญาต WebSocket CORS
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+CSRF_TRUSTED_ORIGINS = [
+    "https://localhost",
+    "https://127.0.0.1",
+    "https://10.225.220.129",
+    "https://172.28.190.185",
 ]
+
+
 
 # ถ้าต้องการให้อนุญาตทุกโดเมน ใช้:
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Channels Allowed Hosts
-ALLOWED_HOSTS = ["localhost", "127.0.0.1","172.28.190.185",]
+# # Channels Allowed Hosts
+# ALLOWED_HOSTS = ["localhost", "127.0.0.1","172.28.190.185","172.29.68.96",]
