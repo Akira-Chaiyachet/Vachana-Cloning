@@ -15,7 +15,26 @@ document.addEventListener("DOMContentLoaded", function () {
   const toggleButton = document.getElementById("sidebar-toggle");
   const sidebar = document.querySelector(".sidebar");
   const searchInput = document.getElementById("searchRoom");
+  const chatRoom = document.getElementById("chatRoom");
+  const voiceRoom = document.getElementById("voiceRoom");
+  const collapseBtn = document.getElementById("collapseChatBtn");
+  const expandBtn = document.getElementById("expandChatBtn");
 
+  collapseBtn.addEventListener("click", function () {
+    chatRoom.classList.add("collapsed");
+    voiceRoom.classList.add("expanded");
+    collapseBtn.style.display = "none";
+    expandBtn.style.display = "block";
+  });
+  expandBtn.addEventListener("click", function () {
+    chatRoom.classList.remove("collapsed");
+    voiceRoom.classList.remove("expanded");
+    collapseBtn.style.display = "block";
+    expandBtn.style.display = "none";
+  });
+
+  // ซ่อนปุ่ม expand ตอนเริ่ม
+  expandBtn.style.display = "none";
   // --- 2. ส่วนของการควบคุม Sidebar (โค้ดที่คุณต้องการเพิ่มเข้ามา) ---
   // ตรวจสอบก่อนว่า element ของ sidebar มีอยู่จริงหรือไม่ เพื่อป้องกัน error
   if (appContainer && toggleButton && sidebar) {
@@ -394,7 +413,7 @@ function loadRoom(roomId, roomName, inviteCode) {
     document.getElementById("welcome-message").style.display = "none";
     document.getElementById("users-header").style.display = "block";
   }
-  document.getElementById("roomTitle").textContent = roomName;
+  document.getElementById("roomTitle").textContent = `${roomName} [ID:${inviteCode}]`;
   // document.getElementById("leaveBtn").style.display = "inline-block";
   document.getElementById("settingsBtn").style.display = "inline-block";
   // ตรวจสอบว่ามี invite code หรือไม่ และจัดการการแสดงผลของปุ่ม

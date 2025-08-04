@@ -264,17 +264,56 @@ body {
     text-overflow: ellipsis;
     /* ... สไตล์สี, ขนาดตัวอักษร อื่นๆ ... */
     color: #e0e0e0;
-    font-size: 16px;
+    font-size: 12px;
 }
 .voie-room-title {
-    width: 30%; /* ทำให้ div นี้กว้างเต็ม .main-content-area */
-    box-sizing: border-box; 
+    display: flex;
+    align-items: center;
+    width: 30%;
     background-color: rgb(46, 51, 56);
-    box-sizing: border-box;
     border-radius: 0;
     margin-top: -15px;
     max-height: 45px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    position: relative;
 }
+
+.voie-room-title-text {
+    flex: 1;
+    text-align: center;
+    color: #93ada4;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 10px;    /* ขยับขึ้น */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.2px;
+    /* ให้ข้อความอยู่กลาง แม้มีปุ่มด้านขวา */
+}
+
+.voie-room-title button {
+    padding: 7px 20px;
+    border-radius: 5px;
+    font-size: 12px;
+    background: #5f8173;
+    color: #ceffea;
+    border: none;
+    margin-top: 12px;    /* ขยับขึ้น */
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    margin-left: 18px;
+    margin-right: -14px;
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+.voie-room-title button:hover {
+    background: #79ae91;
+    color: #fff;
+}
+
 .main-body-content-wrapper {
     display: flex; /* << ทำให้ .chat-room และ .voice-room อยู่ข้างกัน */
     flex-direction: row; /* (เป็นค่า default อยู่แล้ว แต่ใส่เพื่อความชัดเจน) */
@@ -283,6 +322,7 @@ body {
     min-height: 0;  /* สำคัญสำหรับ nested flex ที่มี scroll */
 }
 .chat-room {
+    position: relative;
     width: 70%; /* ทำให้ div นี้กว้างเต็ม .main-content-area */
     background-color: rgb(70, 75, 80);
     border-top: 1px solid #97b8b462;
@@ -360,7 +400,15 @@ body {
 .user-list img {
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     border-radius: 50%;
+    object-fit: cover;
+    object-position: center;
+    display: block; /* กัน flex ทำ img เป็น inline ยืด */
+    /* ถ้าซ้อน flex ให้ img มี align-self: center; */
 }
 
 .user-list::-webkit-scrollbar {

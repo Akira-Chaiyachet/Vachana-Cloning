@@ -1,13 +1,10 @@
-/* ---------- Voice Room Container ---------- */
 .voice-room {
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: linear-gradient(145deg, #2f3136, #232428);
-    color: #f0f0f0;
-    border-left: 1px solid #202225;
-    box-sizing: border-box;
     position: relative;
+    background: linear-gradient(145deg, #2f3136, #232428);
+    border-left: 1px solid #202225;
     border-radius: 0 8px 8px 0;
     overflow: hidden;
 }
@@ -16,24 +13,43 @@
 .voice-channel-members {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 12px 14px 90px 14px;
-    scroll-behavior: smooth;
+    padding: 12px 14px 100px 14px;
 }
 
+
 .voice-member {
-    display: flex;
-    align-items: center;
-    padding: 10px 12px;
-    margin-bottom: 6px;
-    border-radius: 8px;
-    background-color: #36393f;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  display: flex; align-items: center;
+  gap: 12px;
+  margin-bottom: 7px;
+  padding: 6px 4px;
+  background: transparent !important; /* โปร่งใส */
+  border-radius: 10px;
 }
-.voice-member:hover {
-    background-color: #40444b;
+
+.voice-member.me {
+  border: 2px solid #60c292;
+  box-shadow: 0 0 6px #3d9f72a0;
+  background: rgba(39, 77, 52, 0.13); /* อ่อนๆ */
 }
+
+.voice-avatar {
+  width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+  margin-right: 8px;
+}
+
+.voice-volume-wrapper {
+  display: flex; align-items: center; gap: 6px; margin-left: auto;
+  min-width: 90px;
+}
+
+.voice-volume-label {
+  font-size: 0.95em; color: #b7c9c5; width: 30px; text-align: right;
+}
+
+.voice-volume-slider {
+  width: 70px; accent-color: #86e2a6; /* หรือใช้ theme */
+}
+
 
 .voice-avatar {
     width: 42px;
@@ -61,18 +77,15 @@
 
 /* ---------- Control Bar ---------- */
 .voice-controls {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 12px 20px;
-    background-color: #202225;
+    background: #2b2a3100;
     border-top: 1px solid #292b2f;
-    height: 30px;
-    box-shadow: 0 -2px 6px rgba(0,0,0,0.2);
+    position: relative;
+    min-height: 45px;
+    flex-wrap: wrap; /* สำคัญสำหรับ responsive */
 }
 
 .connection-status {
@@ -101,6 +114,8 @@
 .action-buttons {
     display: flex;
     gap: 12px;
+    margin-left: auto; /* ดันไปขวาสุดเสมอ */
+  
 }
 
 .action-buttons button {
@@ -109,28 +124,30 @@
     color: #f0f0f0;
     width: 42px;
     height: 42px;
-    border-radius: 50%;
+    border-radius: 12px;
     cursor: pointer;
     font-size: 1.3em;
-    transition: background-color 0.2s ease, transform 0.1s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.2s, color 0.2s, transform 0.1s;
 }
+.action-buttons button.disconnect { background-color: #f04747; }
+.action-buttons button.disconnect:hover { background-color: #d73737; }
 .action-buttons button:hover {
-    background-color: #5865f2;
-    color: #fff;
-    transform: scale(1.05);
+    background-color: #5865f2; color: #fff; transform: scale(1.05);
 }
-.action-buttons button.active {
-    background-color: #43b581;
+
+.chat-toggle-btn {
+    padding: 6px 18px;
+    background: #373b41;
+    color: #e7e7e7;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1em;
+    cursor: pointer;
+    box-shadow: 0 1px 3px #15191c09;
 }
-.action-buttons button.disconnect {
-    background-color: #f04747;
-}
-.action-buttons button.disconnect:hover {
-    background-color: #d73737;
-}
+
+.chat-toggle-btn:hover { background: #51576b; }
 
 /* ---------- Pulse Animation ---------- */
 @keyframes pulse {
@@ -168,16 +185,16 @@
 
 /* Default: ขอบโปร่งใส */
 #rtc-status-box {
-  border: 2.5px solid transparent;
-  border-radius: 16px;
-  padding: 7px 14px;
-  display: inline-block;
-  min-width: 180px;
-  transition: border 0.4s, color 0.3s;
-  font-weight: 600;
-  font-size: 1.1em;
-  margin-bottom: 6px;
+    font-size: 0.87em;
+    background: #23272a;
+    color: #b7c9c5;
+    border-radius: 9px;
+    padding: 3px 12px;
+    margin-right: 12px;
+    white-space: nowrap;
+    min-width: 135px;
 }
+
 .rtc-status-server-ok {
   border-color: rgb(156, 194, 189) !important;
   color: rgb(156, 194, 189) !important;
@@ -198,4 +215,55 @@
 .rtc-status-rtc-disconnecting {
   border-color: #ffb347 !important; /* ส้มอ่อน */
   color: #ffb347 !important;
+}
+
+.translate-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;      /* <-- แก้ไข */
+    border-radius: 0;      /* <-- แก้ไข */
+    padding: 0;            /* <-- แก้ไข */
+    margin: 0 16px 0 0;
+    font-size: 0.96em;
+    transition: all 0.2s;
+}
+
+.translate-controls label { color: #9cc0b2; font-weight: 500; }
+.translate-controls select {
+    background: #292b2f;
+    border: 1.2px solid #3b4052;
+    color: #b7c9c5;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 1em;
+}
+
+
+@media (max-width: 900px) {
+    .voice-controls {
+        flex-wrap: wrap;
+        flex-direction: row;
+        align-items: flex-start;
+        padding: 8px 4px;
+        min-height: 100px;
+    }
+    .translate-controls {
+        flex-direction: column !important; /* <-- บังคับแนวตั้ง */
+        align-items: flex-start !important;
+        gap: 0 !important;                 /* <-- ไม่มีช่องว่างเพิ่ม */
+        background: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 0 8px 0 !important;
+        width: 100%;
+    }
+    .translate-controls label {
+        margin-bottom: 3px;
+        margin-right: 0 !important;
+    }
+    .translate-controls select {
+        width: 100%;
+        box-sizing: border-box;
+    }
 }

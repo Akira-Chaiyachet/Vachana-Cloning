@@ -960,3 +960,97 @@ function submitEditRoomProfileForm() {
       alert(displayError);
     });
 }
+function showAudioSettingsModal() {
+  // 1. ดึง template ที่เตรียมไว้
+  const template = document.getElementById("templateAudioSettingsModal");
+  if (!template) return alert("ไม่พบเทมเพลตตั้งค่าเสียง");
+
+  // 2. เปิด modal
+  openGenericModal({
+    title: "ตั้งค่าอุปกรณ์เสียง",
+    bodyHTML: template.innerHTML,
+    footerHTML: `
+      <button class="modal-button-default" onclick="closeGenericModal()">ยกเลิก</button>
+      <button class="modal-button-primary" onclick="saveAudioDeviceFromModal()">บันทึก</button>
+    `
+  });
+
+  // 3. เติมรายชื่ออุปกรณ์ไมค์ใน dropdown
+  setTimeout(populateAudioInputSelect, 20);
+}
+
+// ดึงรายชื่อ device (input) และ set ใน select
+function populateAudioInputSelect() {
+  navigator.mediaDevices.enumerateDevices().then(function(devices) {
+    const select = document.getElementById("audioInputSelect");
+    if (!select) return;
+    select.innerHTML = "";
+    devices.forEach(device => {
+      if (device.kind === "audioinput") {
+        let option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `ไมโครโฟน (${device.deviceId.substr(0,6)})`;
+        select.appendChild(option);
+      }
+    });
+    // set ค่าปัจจุบัน (ถ้ามี)
+    if (window.currentMicDeviceId) {
+      select.value = window.currentMicDeviceId;
+    }
+  });
+
+  // เรียกเติม output device ทันที
+  populateAudioOutputSelect();
+}
+
+function populateAudioOutputSelect() {
+  navigator.mediaDevices.enumerateDevices().then(function(devices) {
+    const select = document.getElementById("audioOutputSelect");
+    if (!select) return;
+    select.innerHTML = "";
+    devices.forEach(device => {
+      if (device.kind === "audiooutput") {
+        let option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `ลำโพง/หูฟัง (${device.deviceId.substr(0,6)})`;
+        select.appendChild(option);
+      }
+    });
+    // set ค่าปัจจุบัน (ถ้ามี)
+    if (window.currentSpeakerDeviceId) {
+      select.value = window.currentSpeakerDeviceId;
+    }
+  });
+}
+// ปุ่ม refresh รายการ
+function refreshAudioDeviceList() {
+  populateAudioInputSelect();
+}
+
+// บันทึก (update device ในระบบ RTC ของคุณ)
+function saveAudioDeviceFromModal() {
+  const inputSelect = document.getElementById("audioInputSelect");
+  const outputSelect = document.getElementById("audioOutputSelect");
+  if (!inputSelect || !outputSelect) return;
+
+  const selectedMic = inputSelect.value;
+  const selectedSpeaker = outputSelect.value;
+
+  window.currentMicDeviceId = selectedMic;
+  window.currentSpeakerDeviceId = selectedSpeaker;
+
+  // (1) Update input (เช่น getUserMedia ใหม่)
+  // navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedMic } } })
+  //   .then(...);
+
+  // (2) Update output (audio element)
+  document.querySelectorAll("audio.voice-output").forEach(audio => {
+    if (typeof audio.setSinkId === "function") {
+      audio.setSinkId(selectedSpeaker).catch(err =>
+        alert("เปลี่ยนเสียงออกไม่ได้: " + err)
+      );
+    }
+  });
+
+  closeGenericModal();
+}

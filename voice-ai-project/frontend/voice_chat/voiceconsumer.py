@@ -1,4 +1,4 @@
-# voice_chat/voiceConsumer.py
+# R:\s\PlatFormV2\voice-ai-project\frontend\voice_chat\voiceconsumer.py
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async

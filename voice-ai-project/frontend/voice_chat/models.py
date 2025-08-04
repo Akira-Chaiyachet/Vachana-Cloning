@@ -1,3 +1,4 @@
+# R:\s\PlatFormV2\voice-ai-project\frontend\voice_chat\models.py
 from django.db import models # type: ignore
 import uuid, os, random
 from users.models import CustomUser 

@@ -1,0 +1,269 @@
+.voice-room {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    background: linear-gradient(145deg, #2f3136, #232428);
+    border-left: 1px solid #202225;
+    border-radius: 0 8px 8px 0;
+    overflow: hidden;
+}
+
+/* ---------- Member List ---------- */
+.voice-channel-members {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 12px 14px 100px 14px;
+}
+
+
+.voice-member {
+  display: flex; align-items: center;
+  gap: 12px;
+  margin-bottom: 7px;
+  padding: 6px 4px;
+  background: transparent !important; /* โปร่งใส */
+  border-radius: 10px;
+}
+
+.voice-member.me {
+  border: 2px solid #60c292;
+  box-shadow: 0 0 6px #3d9f72a0;
+  background: rgba(39, 77, 52, 0.13); /* อ่อนๆ */
+}
+
+.voice-avatar {
+  width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+  margin-right: 8px;
+}
+
+.voice-volume-wrapper {
+  display: flex; align-items: center; gap: 6px; margin-left: auto;
+  min-width: 90px;
+}
+
+.voice-volume-label {
+  font-size: 0.95em; color: #b7c9c5; width: 30px; text-align: right;
+}
+
+.voice-volume-slider {
+  width: 70px; accent-color: #86e2a6; /* หรือใช้ theme */
+}
+
+
+.voice-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    margin-right: 12px;
+    object-fit: cover;
+    border: 2px solid transparent;
+    transition: 0.2s ease-in-out;
+}
+.voice-member.speaking .voice-avatar {
+    border-color: #43b581;
+    box-shadow: 0 0 10px #43b581;
+}
+
+.voice-username {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #e4e6eb;
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Control Bar ---------- */
+.voice-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #2b2a3100;
+    border-top: 1px solid #292b2f;
+    position: relative;
+    min-height: 45px;
+    flex-wrap: wrap; /* สำคัญสำหรับ responsive */
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+    color: #ccc;
+}
+#voice-status-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 10px;
+    display: inline-block;
+}
+.icon-connected { background-color: #43b581; }
+.icon-connecting { background-color: #faa61a; animation: pulse 1.5s infinite; }
+.icon-disconnected { background-color: #f04747; }
+
+#voice-status-text {
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+/* ---------- Action Buttons ---------- */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-left: auto; /* ดันไปขวาสุดเสมอ */
+  
+}
+
+.action-buttons button {
+    background-color: #40444b;
+    border: none;
+    color: #f0f0f0;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.3em;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.2s, color 0.2s, transform 0.1s;
+}
+.action-buttons button.disconnect { background-color: #f04747; }
+.action-buttons button.disconnect:hover { background-color: #d73737; }
+.action-buttons button:hover {
+    background-color: #5865f2; color: #fff; transform: scale(1.05);
+}
+
+.chat-toggle-btn {
+    padding: 6px 18px;
+    background: #373b41;
+    color: #e7e7e7;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1em;
+    cursor: pointer;
+    box-shadow: 0 1px 3px #15191c09;
+}
+
+.chat-toggle-btn:hover { background: #51576b; }
+
+/* ---------- Pulse Animation ---------- */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(250, 166, 26, 0.7); }
+    70% { box-shadow: 0 0 0 12px rgba(250, 166, 26, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(250, 166, 26, 0); }
+}
+.profile-img-voice {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.voice-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 15px;
+  padding: 4px 0;
+}
+.room-member {
+  display: flex; align-items: center; margin-bottom: 8px;
+}
+.room-member.me { background: #35393f; }
+.member-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
+.role-label { background: #444c5a; color: #eee; padding: 2px 8px; border-radius: 8px; font-size: 0.85em; margin-left: 8px; }
+.status-label { margin-left: auto; font-size: 0.9em; opacity: 0.8; }
+
+.voice-member { display: flex; align-items: center; margin-bottom: 7px; }
+.voice-member.me { background: #244670; }
+.voice-avatar { width: 30px; height: 30px; border-radius: 50%; margin-right: 8px; }
+
+/* Default: ขอบโปร่งใส */
+#rtc-status-box {
+    font-size: 0.87em;
+    background: #23272a;
+    color: #b7c9c5;
+    border-radius: 9px;
+    padding: 3px 12px;
+    margin-right: 12px;
+    white-space: nowrap;
+    min-width: 135px;
+}
+
+.rtc-status-server-ok {
+  border-color: rgb(156, 194, 189) !important;
+  color: rgb(156, 194, 189) !important;
+}
+.rtc-status-server-fail {
+  border-color: #e57373 !important; /* แดงอ่อน */
+  color: #e57373 !important;
+}
+.rtc-status-rtc-connecting {
+  border-color: #74b9ff !important; /* ฟ้าอ่อน */
+  color: #74b9ff !important;
+}
+.rtc-status-rtc-ok,
+.rtc-status-rtc-ready {
+  border-color: rgb(156, 194, 189) !important;
+  color: rgb(156, 194, 189) !important;
+}
+.rtc-status-rtc-disconnecting {
+  border-color: #ffb347 !important; /* ส้มอ่อน */
+  color: #ffb347 !important;
+}
+
+.translate-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;      /* <-- แก้ไข */
+    border-radius: 0;      /* <-- แก้ไข */
+    padding: 0;            /* <-- แก้ไข */
+    margin: 0 16px 0 0;
+    font-size: 0.96em;
+    transition: all 0.2s;
+}
+
+.translate-controls label { color: #9cc0b2; font-weight: 500; }
+.translate-controls select {
+    background: #292b2f;
+    border: 1.2px solid #3b4052;
+    color: #b7c9c5;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 1em;
+}
+
+
+@media (max-width: 900px) {
+    .voice-controls {
+        flex-wrap: wrap;
+        flex-direction: row;
+        align-items: flex-start;
+        padding: 8px 4px;
+        min-height: 100px;
+    }
+    .translate-controls {
+        flex-direction: column !important; /* <-- บังคับแนวตั้ง */
+        align-items: flex-start !important;
+        gap: 0 !important;                 /* <-- ไม่มีช่องว่างเพิ่ม */
+        background: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 0 8px 0 !important;
+        width: 100%;
+    }
+    .translate-controls label {
+        margin-bottom: 3px;
+        margin-right: 0 !important;
+    }
+    .translate-controls select {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}

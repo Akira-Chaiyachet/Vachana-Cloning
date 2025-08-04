@@ -1,3 +1,4 @@
+// R:\s\PlatFormV2\voice-ai-project\frontend\static\voice_chat\js\RTC_03.22.js
 // --- Discord-style Voice Chat RTC State + Auto-Reconnect (Self-contained) ---
 
 // ========= Module-Scoped RTC/Voice State =========
@@ -9,6 +10,8 @@ let rtcPeerConnections = {};
 let rtcLocalStream = null;
 let initiatedOffers = {}; // module-scope
 let pendingICECandidates = {}; // { peerId: [candidate, ...] }
+let isMicMuted = false;
+let isSpeakerMuted = false;
 
 // ========= Auto-Reconnect Utility (สำหรับ WS signaling) =========
 function createAutoReconnectWS(
@@ -159,6 +162,11 @@ function joinVoiceRoom(roomId) {
     .getUserMedia({ audio: true, video: false })
     .then((stream) => {
       rtcLocalStream = stream;
+      if (isMicMuted) {
+        rtcLocalStream
+          .getAudioTracks()
+          .forEach((track) => (track.enabled = false));
+      }
       rtcActiveRoomId = roomId;
       rtcIsJoined = true;
       if (rtcSignalingWSHandler)
@@ -232,15 +240,39 @@ function updateVoiceMembersUI(members, roomId = null) {
   const myId = String(window.myRTCUserId || window.currentUserId || "");
   members.forEach((member) => {
     const isMe = myId && String(member.userId) === myId;
+    const peerId = member.userId;
     el.innerHTML += `
-            <div class="voice-member${isMe ? " me" : ""}">
-                <span class="mic-icon">🎤</span>
-                <img src="${member.avatarUrl || "/media/default/user.png"}"
-                     class="voice-avatar"
-                     style="width:32px;height:32px;border-radius:50%;margin-right:8px;">
-                <span>${member.displayName}${isMe ? " (คุณ)" : ""}</span>
-            </div>`;
+        <div class="voice-member${isMe ? " me" : ""}" data-peer-id="${peerId}">
+            <img src="${member.avatarUrl || "/media/default/user.png"}"
+                class="voice-avatar">
+            <span class="voice-member-name">${member.displayName}</span>
+            ${
+              !isMe
+                ? `
+                    <div class="voice-volume-wrapper">
+                        <span class="voice-volume-label" id="volume-label-${peerId}">100</span>
+                        <input 
+                            type="range" 
+                            class="voice-volume-slider"
+                            min="0" max="200" value="100" 
+                            data-peer-id="${peerId}"
+                            oninput="onVoiceVolumeChange('${peerId}', this.value)">
+                    </div>
+                  `
+                : ""
+            }
+        </div>
+    `;
   });
+}
+function onVoiceVolumeChange(peerId, value) {
+    const audio = document.getElementById(`voice-audio-${peerId}`);
+    if (audio) {
+        audio.volume = Math.min(Number(value), 200) / 100; // รองรับถึง 2.0
+    }
+    // อัปเดต label
+    const label = document.getElementById(`volume-label-${peerId}`);
+    if (label) label.textContent = value;
 }
 
 window.joinVoiceRoom = joinVoiceRoom;
@@ -523,4 +555,38 @@ function ensureTrackForAllPeers() {
       }
     });
   });
+}
+function toggleMicMute() {
+  isMicMuted = !isMicMuted;
+  // ถ้ามี localStream อยู่ ให้ apply ทันที
+  if (rtcLocalStream) {
+    rtcLocalStream.getAudioTracks().forEach((track) => {
+      track.enabled = !isMicMuted; // enabled = false = mute
+    });
+  }
+  updateMicButtonUI(); // อัปเดตสีปุ่ม
+}
+function toggleSpeakerMute() {
+  isSpeakerMuted = !isSpeakerMuted;
+  // ปิด/เปิดเสียงทุก peer
+  document.querySelectorAll('audio[id^="voice-audio-"]').forEach((audio) => {
+    audio.muted = isSpeakerMuted;
+  });
+  updateSpeakerButtonUI();
+}
+function updateMicButtonUI() {
+  const btn = document.getElementById("micBtn");
+  if (isMicMuted) {
+    btn.style.background = "#ff5252"; // แดงอ่อน
+  } else {
+    btn.style.background = "";
+  }
+}
+function updateSpeakerButtonUI() {
+  const btn = document.getElementById("speakerBtn");
+  if (isSpeakerMuted) {
+    btn.style.background = "#ff5252"; // แดงอ่อน
+  } else {
+    btn.style.background = "";
+  }
 }

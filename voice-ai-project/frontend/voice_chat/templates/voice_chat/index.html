@@ -1,3 +1,4 @@
+<!-- R:\s\PlatFormV2\voice-ai-project\frontend\voice_chat\templates\voice_chat\index.html -->
 <!DOCTYPE html>
 
 <html lang="en">
@@ -6,10 +7,10 @@
     <meta charset="UTF-8">
     <title translate="no">Vachana Cloning</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'voice_chat/css/style_3.16.css' %}">
-    <link rel="stylesheet" href="{% static 'voice_chat/css/popup2.css' %}">
-    <link rel="stylesheet" href="{% static 'voice_chat/css/chat_rom_03.5.css' %}">
-    <link rel="stylesheet" href="{% static 'voice_chat/css/RTC_03.7.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/style_3.19.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/popup3.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/chat_rom_03.7.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/RTC_03.8.css' %}">
 </head>
 
 <body data-current-user-id="{{ request.user.id }}">
@@ -39,7 +40,7 @@
                         </path>
                     </g>
                 </svg>
-                <input placeholder="ค้นหาห้อง" type="search" class="input_search" id="searchRoom"
+                <input placeholder="(ID และ URL เท่านั้น)" type="search" class="input_search" id="searchRoom"
                     onkeydown="handleSearch(event)">
             </div>
             <br>
@@ -74,40 +75,40 @@
                         </div>
                     </div>
                 </div>
-                <div class="voie-room-title"
-                    style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 id="roomTitle" style="display:inline-block;">ห้องพูดคุย</h2>
-                    <button onclick="window.handleJoinVoiceClick()">เข้าร่วม</button>
-
-
+                <div class="voie-room-title">
+                    <div class="voie-room-title-text">
+                        <h2 style="margin:0;">ห้องพูดคุย</h2>
+                    </div>
+                    <div>
+                        <button onclick="window.handleJoinVoiceClick()">เข้าร่วม</button>
+                    </div>
                 </div>
-
             </div>
             <div class="main-body-content-wrapper">
-                <div class="chat-room">
+                <div class="chat-room" id="chatRoom">
                     <div id="chatMessages" class="chat-messages"></div>
                     <form id="chatForm" class="chat-form" autocomplete="off">
                         <input type="text" id="chatInput" placeholder="พิมพ์ข้อความ..." autocomplete="off" required>
                         <button type="submit">ส่ง</button>
                     </form>
+                    <button class="chat-toggle-btn" id="collapseChatBtn" title="พับหน้าต่างแชท">
+                        &lt;</button>
                 </div>
-                <div class="voice-room">
+                <div class="voice-room" id="voiceRoom">
+                    <!-- 1. Translate Controls (บนสุด) -->
+                    <!-- 2. RTC Status (เล็กๆ ใต้ translate-controls) -->
+                    <!-- 3. Member List -->
                     <div class="voice-channel-members" id="voiceMembersEl">
                         <!-- สมาชิกที่ join จะถูกเพิ่มที่นี่โดย JavaScript -->
                     </div>
+                    <!-- 4. Control Bar (แถบล่างติดขอบ) -->
                     <div class="voice-controls">
-                        <!-- ปุ่ม/สถานะ RTC ฯลฯ -->
                         <div id="rtc-status-box" class="connection-status">
                             <span id="voice-status-text">ระบบRTCพร้อมใช้งาน...</span>
                         </div>
-                        <div class="action-buttons">
-                            <button class="disconnect" onclick="confirmLeaveVoiceRoom()" title="ออก">📞
-                            </button>
-                        </div>
-                        <!-- Translate Dropdown -->
-                        <div class="translate-controls" style="margin-top: 10px;">
+                        <div class="translate-controls">
                             <label for="voice-translate-select">แปลเสียงเป็นภาษา:</label>
-                            <select id="voice-translate-select" onchange="onVoiceTranslateChange(this)">
+                            <select id="voice-translate-select">
                                 <option value="off">ไม่แปล (ฟังเสียงต้นฉบับ)</option>
                                 <option value="th">แปลเป็นไทย</option>
                                 <option value="en">แปลเป็นอังกฤษ</option>
@@ -115,8 +116,18 @@
                                 <option value="zh">แปลเป็นจีน</option>
                             </select>
                         </div>
+
+                        <div class="action-buttons">
+                            <button onclick="showAudioSettingsModal()" title="ตั้งค่าเสียง">⚙️</button>
+                            <button id="micBtn" title="เปิด/ปิดไมค์" onclick="toggleMicMute()">🎙️</button>
+                            <button id="speakerBtn" title="เปิด/ปิดเสียง" onclick="toggleSpeakerMute()">🔈</button>
+                            <button class="disconnect" onclick="confirmLeaveVoiceRoom()" title="ออก">📞</button>
+                        </div>
+                        <button class="chat-toggle-btn collapsed" id="expandChatBtn" title="ขยายหน้าต่างแชท">💬
+                            &gt;</button>
                     </div>
                 </div>
+
 
             </div>
         </div>
@@ -304,6 +315,19 @@
                 style="display: none; margin-top:15px;"></div>
         </form>
     </template>
+    <template id="templateAudioSettingsModal">
+        <div>
+            <label for="audioInputSelect">เลือกไมโครโฟน:</label>
+            <select id="audioInputSelect" style="margin-bottom:12px;width:100%;"></select>
+            <label for="audioOutputSelect">เลือกลำโพง/หูฟัง (เสียงออก):</label>
+            <select id="audioOutputSelect" style="margin-bottom:12px;width:100%;"></select>
+            <button onclick="refreshAudioDeviceList()" style="margin-top:6px;">รีเฟรชรายชื่ออุปกรณ์</button>
+            <div style="color:#888; font-size:0.95em; margin-top:8px;">
+                * การเปลี่ยนอุปกรณ์จะมีผลทันทีโดยไม่ต้องออกจากห้อง
+            </div>
+        </div>
+    </template>
+
 
     <!-- User Context Menu (Right-click menu on a user) -->
     <div id="userContextMenu" class="popup-menu user-context-specific-styles">
@@ -312,11 +336,11 @@
         </ul>
     </div>
 
-    <script src="{% static 'voice_chat/js/script_03.31.js' %}"></script>
+    <script src="{% static 'voice_chat/js/script_03.32.js' %}"></script>
     <script src="{% static 'voice_chat/js/script_03.2.19.js' %}"></script>
     <script src="{% static 'voice_chat/js/chat_rom_03.04.js' %}"></script>
-    <script src="{% static 'voice_chat/js/popup_03.6.js' %}"></script>
-    <script src="{% static 'voice_chat/js/RTC_03.22.js' %}"></script>
+    <script src="{% static 'voice_chat/js/popup_03.7.js' %}"></script>
+    <script src="{% static 'voice_chat/js/RTC_03.25.js' %}"></script>
     <script>
         window.myRTCUserId = "{{ request.user.id }}";
         if (window.myRTCUserId && window.myRTCUserId !== "null" && window.myRTCUserId !== "") {

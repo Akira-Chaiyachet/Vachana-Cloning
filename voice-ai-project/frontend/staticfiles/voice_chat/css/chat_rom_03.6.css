@@ -100,3 +100,48 @@
     background: #1A1B1E;
 }
 
+/* --- Toggle Button Style --- */
+.chat-toggle-btn {
+    position: absolute;
+    bottom: 24px;
+    right: 18px;
+    background: #454a54;
+    color: #e0e8f0;
+    border: none;
+    border-radius: 40px;
+    width: 48px;
+    height: 48px;
+    font-size: 1.6em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+    cursor: pointer;
+    z-index: 111;
+    transition: background 0.17s, transform 0.15s;
+}
+.chat-toggle-btn:hover {
+    background: #6871a4;
+    transform: scale(1.12);
+}
+.chat-toggle-btn.collapsed {
+    left: 22px;
+    right: auto;
+    bottom: 22px;
+}
+
+/* --- Collapsed Chat-room + Expanded Voice-room --- */
+.chat-room.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.35s cubic-bezier(.52,1.64,.37,.66);
+    position: relative;
+}
+.voice-room.expanded {
+    width: 100% !important;
+    max-width: 100% !important;
+    transition: width 0.33s cubic-bezier(.52,1.64,.37,.66);
+    border-radius: 0 12px 12px 0;
+}
