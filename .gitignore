@@ -1,11 +1,20 @@
-# Virtual environments
+# Virtual env
 *.venv/
 venv/
 voice-ai-project/.venv/
 voice-ai-project/backend/models/*/venv/
 
-# VS Code settings
+# Model weights / artifacts
+*.bin
+*.pth
+*.pt
+*.onnx
+*.npz
+*.safetensors
+voice-ai-project/backend/models/**/ctranslate2-m2m100/
+
+# Editors
 .vscode/
 
-# Local/private files
+# Local
 คำสั่ง.txt
