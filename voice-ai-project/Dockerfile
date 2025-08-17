@@ -8,10 +8,10 @@ WORKDIR /app/frontend
 RUN apt update && apt install -y default-mysql-client
 # ติดตั้ง FFmpeg
 RUN apt-get update && apt-get install -y ffmpeg
+RUN pip install --upgrade mysqlclient
 # คัดลอกไฟล์ requirements.txt และติดตั้ง dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt 
-
 # คัดลอกโปรเจกต์ทั้งหมด
 COPY . .
 

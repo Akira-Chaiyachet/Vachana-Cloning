@@ -1,3 +1,11 @@
+# Virtual environments
+*.venv/
+venv/
 voice-ai-project/.venv/
+voice-ai-project/backend/models/*/venv/
+
+# VS Code settings
 .vscode/
+
+# Local/private files
 คำสั่ง.txt

@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+TTS==0.22.0          # หรือเวอร์ชันล่าสุดที่รองรับ XTTS-v2
+soundfile
+numpy
+python-multipart     # สำหรับไฟล์อัปโหลดใน FastAPI
+transformers==4.37.2    # <-- เพิ่มบรรทัดนี้!

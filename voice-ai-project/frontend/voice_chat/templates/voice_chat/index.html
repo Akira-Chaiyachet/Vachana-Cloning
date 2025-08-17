@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{% static 'voice_chat/css/popup3.css' %}">
     <link rel="stylesheet" href="{% static 'voice_chat/css/chat_rom_03.7.css' %}">
     <link rel="stylesheet" href="{% static 'voice_chat/css/RTC_03.8.css' %}">
+    <link rel="stylesheet" href="{% static 'voice_chat/css/sub.css' %}">
 </head>
 
 <body data-current-user-id="{{ request.user.id }}">
@@ -106,6 +107,16 @@
                         <div id="rtc-status-box" class="connection-status">
                             <span id="voice-status-text">ระบบRTCพร้อมใช้งาน...</span>
                         </div>
+                        <div class="translate-controls" style="margin-left:12px;">
+                            <label for="voice-source-select">ฉันกำลังพูดภาษา:</label>
+                            <select id="voice-source-select">
+                                <option value="auto" selected>Auto (ตรวจอัตโนมัติ)</option>
+                                <option value="th">ไทย</option>
+                                <option value="en">อังกฤษ</option>
+                                <option value="ja">ญี่ปุ่น</option>
+                                <option value="zh">จีน</option>
+                            </select>
+                        </div>
                         <div class="translate-controls">
                             <label for="voice-translate-select">แปลเสียงเป็นภาษา:</label>
                             <select id="voice-translate-select">
@@ -113,7 +124,7 @@
                                 <option value="th">แปลเป็นไทย</option>
                                 <option value="en">แปลเป็นอังกฤษ</option>
                                 <option value="ja">แปลเป็นญี่ปุ่น</option>
-                                <option value="zh">แปลเป็นจีน</option>
+                                <option value="zh-cn">แปลเป็นจีน</option>
                             </select>
                         </div>
 
@@ -340,7 +351,9 @@
     <script src="{% static 'voice_chat/js/script_03.2.19.js' %}"></script>
     <script src="{% static 'voice_chat/js/chat_rom_03.04.js' %}"></script>
     <script src="{% static 'voice_chat/js/popup_03.7.js' %}"></script>
-    <script src="{% static 'voice_chat/js/RTC_03.25.js' %}"></script>
+    <script src="{% static 'voice_chat/js/RTC_03.33.js' %}"></script>
+    <script src="{% static 'voice_chat/js/vpl_ws_07.js' %}"></script>
+    <script src="{% static 'voice_chat/js/sub_01.js' %}?v=20250811"></script>
     <script>
         window.myRTCUserId = "{{ request.user.id }}";
         if (window.myRTCUserId && window.myRTCUserId !== "null" && window.myRTCUserId !== "") {
@@ -374,6 +387,45 @@
 
     </script>
 
+    <script>
+        // 1) สร้าง VoicePipeline ด้วย URL dev (พอร์ต 8010)
+        const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/voice';
+
+        window.voicePipeline = new VoicePipeline({
+            url,
+            userId: String(window.myRTCUserId || ''),
+            getRoomId: () => String(window.currentChatRoomId || ''),
+            onDucking: () => {},
+            onMetrics: (m) => {
+                const el = document.getElementById('voice-status-text');
+                if (!el || !m) return;
+                const ms = m.latencyMs || {};
+                const hint = (ms.mt === 0 || ms.tts === 0) ? ' ⏳' : '';
+                el.textContent = `Latency — STT: ${ms.stt || 0}ms | MT: ${ms.mt || 0}ms | TTS: ${ms.tts || 0}ms | E2E: ${ms.e2e || 0}ms${hint}`;
+            },
+            log: (...a) => console.log('[VPL]', ...a),
+        });
+
+
+        // 2) bind dropdown + ตั้งค่าเริ่มต้นตอนโหลด
+        document.addEventListener('DOMContentLoaded', () => {
+            const srcSel = document.getElementById('voice-source-select');
+            const tgtSel = document.getElementById('voice-translate-select');
+
+            function applyLanguagePrefs() {
+                if (srcSel) window.voicePipeline?.setSourceLang(srcSel.value || 'auto');
+                if (tgtSel) window.voicePipeline?.setTargetLang(tgtSel.value === 'off' ? 'off' : tgtSel.value);
+            }
+
+            if (srcSel) srcSel.addEventListener('change', applyLanguagePrefs);
+            if (tgtSel) tgtSel.addEventListener('change', applyLanguagePrefs);
+
+            // ตั้งค่ารอบแรกทันที เพื่อ “ให้มีผลจริง” ตั้งแต่ยังไม่ join
+            applyLanguagePrefs();
+        });
+    </script>
+
+    <div id="vc-captions" aria-live="polite" aria-atomic="true"></div>
 </body>
 
 </html>

@@ -1,0 +1,38 @@
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-venv python3.11-dev \
+      build-essential git wget curl ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN pip install --upgrade pip
+
+# Install torch first (large dependency)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install other common deps
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install ctranslate2 python-multipart
+
+WORKDIR /app
+
+# Install from requirements.txt
+COPY requirements.txt /app/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+# Copy code last
+COPY . /app
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

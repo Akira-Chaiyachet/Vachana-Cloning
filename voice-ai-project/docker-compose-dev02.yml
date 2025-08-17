@@ -1,0 +1,172 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "until mysqladmin ping -h db --silent; do sleep 5; done &&
+             python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    working_dir: /app/frontend
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # ASGI server for WebSocket (Django Channels via Daphne)
+  channels:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/frontend
+    command: >
+      sh -c "until mysqladmin ping -h db --silent; do sleep 5; done &&
+             daphne -b 0.0.0.0 -p 8001 RVC_DJ.asgi:application"
+    volumes:
+      - .:/app
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    depends_on:
+      - web
+      - gateway
+      - channels
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./frontend/staticfiles:/app/frontend/staticfiles
+      - ./frontend/media:/app/frontend/media
+      - ./frontend/dist:/app/frontend/dist
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: voice_ai
+      MYSQL_USER: django_user
+      MYSQL_PASSWORD: VC@V-ai2025
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data_xtts:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  stt:
+    build:
+      context: ./backend/models/stt
+      dockerfile: Dockerfile.stt
+    # NOTE: คุณใช้ runtime:nvidia อยู่แล้ว ถ้าจะย้ายไปสไตล์ใหม่ ใช้ `gpus: all`
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    working_dir: /app
+    volumes:
+      - whisper_models:/root/.cache/whisper
+      - ./backend/models/stt:/app
+    ports:
+      - "8002:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  mt:
+    build:
+      context: ./backend/models/mt
+      dockerfile: Dockerfile.mt
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    working_dir: /app
+    volumes:
+      - ./backend/models/mt/ctranslate2-m2m100:/app/models/ctranslate2-m2m100
+      - ./backend/models/mt:/app
+    ports:
+      - "8003:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  tts:
+    build:
+      context: ./backend/models/tts
+      dockerfile: Dockerfile.tts
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COQUI_TOS_AGREED=1
+      - XTTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+      - DEFAULT_SPEAKER_WAV=/app/assets/default_speaker.wav
+    working_dir: /app
+    volumes:
+      - xtts_models:/root/.local/share/tts
+      - ./backend/models/tts:/app
+      - ./backend/models/tts/assets:/app/assets
+    ports:
+      - "8004:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./backend/models/gateway
+      dockerfile: Dockerfile.gateway
+    working_dir: /app
+    environment:
+      - STT_URL=http://stt:8000/stt
+      - MT_URL=http://mt:8000/mt
+      - TTS_URL=http://tts:8000/tts
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend/models/gateway:/app
+    # ไม่มีการ publish พอร์ต 8010 ออกนอก เพราะให้ nginx proxy ภายในเครือข่าย
+    depends_on:
+      - stt
+      - mt
+      - tts
+    command: uvicorn main:app --host 0.0.0.0 --port 8010
+    restart: unless-stopped
+
+volumes:
+  db_data_xtts:
+  whisper_models:
+  mt_models:
+  xtts_models:

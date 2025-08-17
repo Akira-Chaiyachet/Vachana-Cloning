@@ -1,0 +1,41 @@
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV COQUI_TOS_AGREED=1
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-venv python3.11-dev \
+      build-essential git wget curl ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN pip install --upgrade pip
+
+WORKDIR /app
+
+# Install from requirements.txt
+COPY requirements.txt /app/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+# Japanese tokenizer libs
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir cutlet unidic-lite fugashi
+
+# Copy code last
+COPY . /app
+
+# Optional: Bake XTTS model in image
+# RUN python - <<'PY'
+# from TTS.api import TTS
+# TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+# PY
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
