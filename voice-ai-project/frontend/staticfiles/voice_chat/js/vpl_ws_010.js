@@ -38,7 +38,7 @@
   function nowSec(ac) {
     return ac.currentTime;
   }
-
+  let currentTtsToken = null;
   // Downsample Float32Array @sampleRate to 16k and convert to Int16 PCM
   function floatTo16kPCM(float32, inputSampleRate) {
     const targetRate = 16000;
@@ -261,6 +261,11 @@
     setSpeakerUrl(url) {
       this._send({ type: "set_speaker_url", value: url });
     }
+    close() {
+      try {
+        this.ws?.close();
+      } catch {}
+    }
   }
 
   // ========================= TTSPlayer (WebAudio) =========================
@@ -282,6 +287,9 @@
       this._lastEnd = null;
       this.onSpeak = null;
       this.onSilence = null;
+
+      // NEW: track current play nodes for fade-out
+      this._activeSources = new Set();
     }
     async ensureRunning() {
       if (this.ac.state !== "running") {
@@ -292,10 +300,25 @@
     }
     async enqueueWavChunk(arrayBuffer) {
       await this.ensureRunning();
-      const buf = await this.ac.decodeAudioData(arrayBuffer.slice(0)); // รองรับไมโคร-WAV
-      this.queue.push({ buffer: buf });
+      const buf = await this.ac.decodeAudioData(arrayBuffer.slice(0));
+
+      // ถ้า buffer.duration < 0.25s → สร้าง AudioBuffer ใหม่แล้วแปะเงียบให้ครบ
+      if (buf.duration < 0.25) {
+        const targetDur = 0.25;
+        const padLength = Math.max(0, Math.floor(targetDur * buf.sampleRate) - buf.length);
+        const out = this.ac.createBuffer(buf.numberOfChannels, buf.length + padLength, buf.sampleRate);
+        for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+          out.getChannelData(ch).set(buf.getChannelData(ch), 0);
+          // ส่วนที่เหลือปล่อยเป็นศูนย์ = เงียบ
+        }
+        this.queue.push({ buffer: out });
+      } else {
+        this.queue.push({ buffer: buf });
+      }
       if (!this._playing) this._flush();
     }
+
+
     _flush() {
       if (this._playing) return;
       this._playing = true;
@@ -308,6 +331,7 @@
         this._lastEnd || this.ac.currentTime + 0.02
       );
       const fade = (this.opts.crossfadeMs || 20) / 1000;
+      const baseFade = (this.opts.crossfadeMs || 20) / 1000;
 
       while (this.queue.length) {
         const { buffer } = this.queue.shift();
@@ -315,58 +339,68 @@
         src.buffer = buffer;
         const g = this.ac.createGain();
 
+        // ใช้ fade ไม่เกิน 35% ของความยาวชิ้น และไม่ต่ำกว่า 5ms
+        const dur = buffer.duration;
+        const fade = Math.max(0.005, Math.min(baseFade, dur * 0.35));
+
         g.gain.setValueAtTime(0, t);
         g.gain.linearRampToValueAtTime(this.opts.targetGain, t + fade);
 
-        const end = t + buffer.duration;
+        const end = t + dur;
         g.gain.setValueAtTime(this.opts.targetGain, end - fade);
         g.gain.linearRampToValueAtTime(0, end);
 
         src.connect(g).connect(this.master);
         src.start(t);
 
+        this._activeSources.add({ src, gain: g, start: t, end });
+        src.onended = () => {
+          this._activeSources.forEach((obj) => { if (obj.src === src) this._activeSources.delete(obj); });
+        };
+
         this._lastEnd = end;
         t = end;
       }
 
       const check = () => {
-        if (!this._lastEnd || this.ac.currentTime >= this._lastEnd - 0.01) {
+        const margin = 0.05; // 50ms
+        if (!this._lastEnd || this.ac.currentTime >= this._lastEnd - margin) {
           this._playing = false;
-          try {
-            this.onSilence && this.onSilence();
-          } catch {}
+          try { this.onSilence && this.onSilence(); } catch {}
         } else {
           setTimeout(check, 30);
         }
       };
       setTimeout(check, 30);
     }
+
+    // NEW: fade-out ทุกสิ่งที่กำลังเล่น แล้วล้างคิว (กันซ้อน)
+    hardFlush(fadeMs = 80) {
+      const t = this.ac.currentTime;
+      const fade = (fadeMs || 60) / 1000;
+      this._activeSources.forEach((obj) => {
+        try {
+          obj.gain.gain.cancelScheduledValues(t);
+          obj.gain.gain.setValueAtTime(obj.gain.gain.value, t);
+          obj.gain.gain.linearRampToValueAtTime(0, t + fade);
+          // stop หลัง fade
+          obj.src.stop(t + fade + 0.01);
+        } catch {}
+      });
+      this._activeSources.clear();
+      this.clear();
+      this._playing = false;
+      this._lastEnd = null;
+    }
+
     clear() {
       this.queue.length = 0;
       this._lastEnd = null;
     }
     stop() {
-      this.clear(); /* ไม่ปิด this.ac เพื่อกันเงียบ */
+      // fade-out แล้วเคลียร์
+      this.hardFlush(60);
     }
-  }
-  function hardDuckOriginalAudio(active) {
-    // ปรับ selector ให้ตรงกับ audio element ของคุณ (เช่น class="rtc-remote")
-    const audios = document.querySelectorAll(
-      'audio.rtc-remote, audio[id^="rtc-remote-"], audio[id^="voice-audio-"]'
-    );
-    audios.forEach((a) => {
-      if (active) {
-        if (a.dataset._savedVol === undefined) a.dataset._savedVol = a.volume;
-        a.volume = 0.0; // ปิดเงียบ
-      } else {
-        if (a.dataset._savedVol !== undefined) {
-          a.volume = parseFloat(a.dataset._savedVol);
-          delete a.dataset._savedVol;
-        } else {
-          a.volume = 1;
-        }
-      }
-    });
   }
 
   // ========================= VoicePipeline Facade =========================
@@ -398,12 +432,26 @@
       this.ws.on("mt_partial", (m) => onMTPartial && onMTPartial(m));
       this.ws.on("mt_final", (m) => onMTFinal && onMTFinal(m));
       this.ws.on("metrics", (m) => onMetrics && onMetrics(m));
+      this.ws.on("tts_start", (m) => {
+        const newToken = m.token || null;
+        if (currentTtsToken && newToken && newToken !== currentTtsToken) {
+          this.player.hardFlush(80);    // flush เฉพาะตอนมีรอบใหม่ “แทนที่” ของเก่า
+        }
+        currentTtsToken = newToken;
+      });
       this.ws.on("tts_chunk", async (h) => {
+        if (currentTtsToken && h.token && h.token !== currentTtsToken) {
+          // late chunk ของรอบเก่า ทิ้ง
+          return;
+        }
         try {
           await this.player.enqueueWavChunk(h.bytes);
         } catch (err) {
           this.log("decode tts_chunk error", err);
         }
+      });
+      this.ws.on("tts_end", (m) => {
+        if (currentTtsToken && m.token && m.token !== currentTtsToken) return;
       });
       this.player.onSpeak = () => onDucking && onDucking(true);
       this.player.onSilence = () => onDucking && onDucking(false);
@@ -439,7 +487,7 @@
     }
     setSpeakerUrl(url) {
       this._speakerUrl = url || null;
-      this._send({ type: "set_speaker_url", value: this._speakerUrl });
+      this.ws.setSpeakerUrl(this._speakerUrl);
     }
     setMicMuted(m) {
       this.rec.setMuted(!!m);
@@ -521,5 +569,7 @@
   // ========================= Global attach =========================
   window.VoicePipeline = VoicePipeline;
   window.voicePipeline.targetLang; // ต้องไม่ใช่ 'off'
-  window._duckOriginalAudio = hardDuckOriginalAudio;
+  if (typeof hardDuckOriginalAudio === "function") {
+    window._duckOriginalAudio = hardDuckOriginalAudio;
+  }
 })();

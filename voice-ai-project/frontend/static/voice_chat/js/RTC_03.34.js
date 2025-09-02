@@ -13,6 +13,11 @@ let pendingICECandidates = {}; // { peerId: [candidate, ...] }
 let isMicMuted = false;
 let isSpeakerMuted = false;
 let translateEnabled = false; // เก็บสถานะว่ากำลังแปลอยู่หรือไม่
+// --- First-time tip flag (แสดงครั้งเดียวต่อเบราว์เซอร์/ผู้ใช้) ---
+const FIRST_TIP_KEY = (() => {
+  const uid = (window.currentUserId || window.myRTCUserId || 'anon');
+  return `voice_firsttime_tip_v1_${uid}`;
+})();
 
 // ========= Auto-Reconnect Utility (สำหรับ WS signaling) =========
 function createAutoReconnectWS(
@@ -219,6 +224,7 @@ function joinVoiceRoom(roomId) {
       } catch (e) {
         console.warn(e);
       }
+      maybeShowFirstTimeTip();
     })
     .catch((err) => {
       console.error("getUserMedia error:", err);
@@ -809,3 +815,53 @@ function _bindFirstPlaybackAutoHide() {
 const _voiceLoadMO = new MutationObserver(_bindFirstPlaybackAutoHide);
 _voiceLoadMO.observe(document.body, { childList: true, subtree: true });
 window.addEventListener('beforeunload', () => _voiceLoadMO.disconnect());
+
+
+// ========= First-Time Speak Tip Overlay (one-time) =========
+const _firstTip = { el: null, timer: null };
+
+function maybeShowFirstTimeTip() {
+  try {
+    if (localStorage.getItem(FIRST_TIP_KEY) === '1') return; // เคยแสดงแล้ว → ข้าม
+  } catch {}
+  showFirstTimeSpeakTip();
+}
+
+function showFirstTimeSpeakTip() {
+  if (_firstTip.el) return;
+
+  const el = document.createElement('div');
+  el.id = 'voice-firsttime-tip';
+  el.style.cssText = `
+    position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.55);backdrop-filter:saturate(1.2) blur(2px);color:#fff;flex-direction:column;
+    font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;text-align:center;gap:16px;padding:20px
+  `;
+  el.innerHTML = `
+    <div style="width:48px;height:48px;border-radius:50%;border:4px solid rgba(255,255,255,.35);
+                border-top-color:#fff;animation:spin 1s linear infinite"></div>
+    <div style="font-size:18px;font-weight:700">กรุณาพูดมากกว่า 5 วินาที</div>
+    <div style="font-size:14px;opacity:.95;max-width:560px;line-height:1.55">
+      เพื่อเก็บตัวอย่างเสียงครั้งแรกสำหรับการปรับคุณภาพการสื่อสารอัตโนมัติ ระบบจะทำงานเบื้องหลังและหน้าต่างนี้จะปิดเอง
+    </div>
+    <button id="firsttime-tip-close" style="
+      padding:10px 16px;border-radius:10px;border:0;background:#00a3ff;color:#001018;font-weight:600;">
+      เข้าใจแล้ว
+    </button>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
+  document.body.appendChild(el);
+  _firstTip.el = el;
+
+  // ปิดเองอัตโนมัติใน 10 วินาที
+  _firstTip.timer = setTimeout(hideFirstTimeSpeakTip, 10000);
+
+  // ปุ่มปิดทันที
+  el.querySelector('#firsttime-tip-close')?.addEventListener('click', hideFirstTimeSpeakTip);
+}
+
+function hideFirstTimeSpeakTip() {
+  try { localStorage.setItem(FIRST_TIP_KEY, '1'); } catch {}
+  if (_firstTip.timer) { clearTimeout(_firstTip.timer); _firstTip.timer = null; }
+  if (_firstTip.el) { _firstTip.el.remove(); _firstTip.el = null; }
+}
