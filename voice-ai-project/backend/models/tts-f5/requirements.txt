@@ -1,0 +1,21 @@
+fastapi==0.111.1
+uvicorn[standard]==0.30.5
+soundfile==0.12.1
+cached_path==1.6.6
+
+# Core stack
+numpy==1.26.4
+scipy==1.11.4
+librosa==0.10.2.post1
+torchaudio==2.3.1      # จับคู่ torch เวอร์ชันด้านล่าง
+
+# F5 / inference deps ทั่วไป
+transformers==4.42.4
+accelerate==0.33.0
+sentencepiece==0.2.0
+matplotlib==3.8.4
+Pillow==10.4.0
+pydub==0.25.1
+File
+# เลือกติดตั้ง torch ตาม CUDA runtime ของเครื่อง/คอนเทนเนอร์:
+# - ใน Dockerfile จะติดตั้ง torch ผ่าน index-url ของ PyTorch แทน requirements นี้

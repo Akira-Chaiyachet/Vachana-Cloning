@@ -36,6 +36,8 @@ ENERGY_ABS_GATE = 150  # ถ้าค่าเฉลี่ย abs(sample) < gate
 STT_URL = os.getenv("STT_URL", "http://stt:8000/stt")
 MT_URL = os.getenv("MT_URL", "http://mt:8000/mt")
 TTS_URL = os.getenv("TTS_URL", "http://tts:8000/tts")
+F5_TTS_URL = os.getenv("F5_TTS_URL", "http://tts_f5:8000/tts")  # << เพิ่มบรรทัดนี้
+GENDER_URL = os.getenv("GENDER_URL", "http://gender:8000/detect")
 TTS_CONCURRENCY = int(os.getenv("TTS_CONCURRENCY", "1"))
 MT_CONCURRENCY = int(os.getenv("MT_CONCURRENCY", "4"))
 
@@ -50,12 +52,14 @@ SEGMENT_MIN_MS = 300
 SEGMENT_TARGET_MS = 1200
 SILENCE_TAIL_MS = 200
 SILENCE_LEVEL = 60
-REF_WINDOW_SEC = 5                      # ยาว 5 วินาที
-REF_MAX_BYTES  = SAMPLE_RATE * 2 * REF_WINDOW_SEC  # 16000 * 2 * 5 = 160k bytes
-REF_MIN_MS_FOR_USE = 1200              # อย่างน้อย ~1.2s เพื่อให้โคลนนิ่งนิ่งขึ้น
+REF_WINDOW_SEC = 5  # ยาว 5 วินาที
+REF_MAX_BYTES = SAMPLE_RATE * 2 * REF_WINDOW_SEC  # 16000 * 2 * 5 = 160k bytes
+REF_MIN_MS_FOR_USE = 1200  # อย่างน้อย ~1.2s เพื่อให้โคลนนิ่งนิ่งขึ้น
 
 app = FastAPI()
 APP_VERSION = "gw-2025-08-11T-https-ready-q-per-user"
+DEFAULT_SPEAKER_URL_MALE = os.getenv("DEFAULT_SPEAKER_URL_MALE", "")
+DEFAULT_SPEAKER_URL_FEMALE = os.getenv("DEFAULT_SPEAKER_URL_FEMALE", "")
 
 
 @app.get("/version")
@@ -142,6 +146,25 @@ async def call_stt(wav_bytes: bytes, lang_hint: Optional[str] = None):
         return "", None
 
 
+async def call_gender(wav_bytes: bytes) -> tuple[str, float]:
+    """เรียก gender-detector; คืน (gender, confidence). ถ้าพัง → ('unknown', 0.0)"""
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=3.0, read=5.0, write=5.0, pool=3.0)
+        ) as client:
+            files = {"file": ("seg.wav", wav_bytes, "audio/wav")}
+            r = await client.post(GENDER_URL, files=files)
+            r.raise_for_status()
+            js = r.json()
+            if js.get("ok"):
+                return str(js.get("gender", "unknown")), float(
+                    js.get("confidence", 0.0)
+                )
+    except Exception:
+        pass
+    return "unknown", 0.0
+
+
 async def call_mt(text: str, src_lang: str, tgt_lang: str) -> str:
     if not text.strip():
         return ""
@@ -158,22 +181,49 @@ async def call_mt(text: str, src_lang: str, tgt_lang: str) -> str:
 
 
 # เพิ่มฟังก์ชันใหม่ (อย่าแทนที่ของเดิม เผื่อใช้ url ได้ด้วย)
-async def call_tts_wav_with_ref(text: str, language: str, speaker_wav_bytes: bytes) -> bytes:
+async def call_tts_wav_with_ref(
+    text: str,
+    language: str,
+    speaker_wav_bytes: bytes,
+    *,
+    tts_url: Optional[str] = None,
+    ref_text: Optional[str] = None,
+) -> bytes:
     if not text.strip():
         return b""
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_TTS) as client:
+            url = tts_url or TTS_URL
             data = {"text": text, "language": _norm_lang(language)}
-            # multipart: ส่ง reference wav ไปใน field 'speaker_wav'
+            # เฉพาะบาง backend (เช่น F5) ต้องการ ref_text → ส่งให้เมื่อมี
+            if ref_text is not None:
+                data["ref_text"] = ref_text
             files = {"speaker_wav": ("ref.wav", speaker_wav_bytes, "audio/wav")}
-            r = await client.post(TTS_URL, data=data, files=files)
+            r = await client.post(url, data=data, files=files)
             r.raise_for_status()
             return r.content
     except (httpx.TimeoutException, httpx.HTTPError):
         return b""
 
 
-async def call_tts_wav(text: str, language: str, speaker_url: Optional[str] = None) -> bytes:
+# gateway/main.py
+async def call_f5_tts_preset(text: str, *, preset: str) -> bytes:
+    if not text.strip():
+        return b""
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_TTS) as client:
+            data = {"text": text, "language": "th", "preset": preset}
+            r = await client.post(F5_TTS_URL, data=data)
+            r.raise_for_status()
+            return r.content
+    except (httpx.TimeoutException, httpx.HTTPError):
+        return b""
+
+
+
+async def call_tts_wav(
+    text: str, language: str, speaker_url: Optional[str] = None
+) -> bytes:
     if not text.strip():
         return b""
     try:
@@ -204,6 +254,9 @@ class Session:
         self.silence_run = 0
         self.seg_start_ms = 0
         self.cooldown_until = 0.0
+        self.gender: str = "unknown"
+        self.gender_conf: float = 0.0
+        self._last_gender_ts: float = 0.0
 
         # raw audio buffer for endpointing
         self.buf = bytearray()
@@ -222,8 +275,8 @@ class Session:
         )
 
         self.speaker_url: Optional[str] = None
-        self.ref_ring = bytearray()           # เก็บ PCM s16le 16k mono
-        self.ref_voiced_ms = 0                # นับเวลา voiced ที่มีใน ring (ms)
+        self.ref_ring = bytearray()  # เก็บ PCM s16le 16k mono
+        self.ref_voiced_ms = 0  # นับเวลา voiced ที่มีใน ring (ms)
 
     async def safe_send_json(self, obj: Dict[str, Any]):
         if not self.alive:
@@ -252,6 +305,7 @@ class Session:
                 await self.ws.send_bytes(chunk)
         except Exception:
             self.alive = False
+
     def feed_ref(self, frame: bytes, is_voiced: bool):
         """เพิ่มเฟรมลง reference buffer; เก็บเฉพาะที่เป็นเสียงพูด (voiced) เพื่อคุณภาพ"""
         if not is_voiced:
@@ -399,7 +453,9 @@ async def listener_worker(session: Session):
 
                 # 1) MT
                 t2a = time.time()
-                mt_text = await call_mt(job["stt_text"], job["src_lang"], job["tgt_lang"]) 
+                mt_text = await call_mt(
+                    job["stt_text"], job["src_lang"], job["tgt_lang"]
+                )
                 t2b = time.time()
 
                 if not session.alive:
@@ -439,55 +495,86 @@ async def listener_worker(session: Session):
                 path_used = "none"
 
                 async with TTS_SEM:
-                    use_ref = False
-                    if ref_wav:
-                        try:
-                            with wave.open(io.BytesIO(ref_wav), "rb") as wf:
-                                sr = wf.getframerate(); n = wf.getnframes()
-                                dur_ms = (n / max(sr,1)) * 1000.0
-                                use_ref = dur_ms >= REF_MIN_MS_FOR_USE   # ≥ ~1.2s ค่อยใช้
-                        except Exception:
-                            use_ref = False
+                    norm_lang = _norm_lang(job["tgt_lang"])
 
-
-                    if use_ref:
-                        wav_tgt = await call_tts_wav_with_ref(
-                            mt_text, language=job["tgt_lang"], speaker_wav_bytes=ref_wav
-                        )
+                    if norm_lang == "th":
+                        preset = "female" if session.gender == "female" else "male"
+                        wav_tgt = await call_f5_tts_preset(mt_text, preset=preset)
                         if wav_tgt:
-                            path_used = "speaker_wav_ref"
+                            path_used = f"f5_preset_{preset}"
 
-                    if not wav_tgt and session.speaker_url:
-                        wav_tgt = await call_tts_wav(
-                            mt_text, language=job["tgt_lang"], speaker_url=session.speaker_url
-                        )
-                        if wav_tgt:
-                            path_used = "speaker_url"
+                    else:
+                        # ภาษาอื่น → คง flow เดิม (XTTS)
+                        use_ref = False
+                        if ref_wav:
+                            try:
+                                with wave.open(io.BytesIO(ref_wav), "rb") as wf:
+                                    sr = wf.getframerate()
+                                    n = wf.getnframes()
+                                    dur_ms = (n / max(sr, 1)) * 1000.0
+                                    use_ref = dur_ms >= REF_MIN_MS_FOR_USE
+                            except Exception:
+                                use_ref = False
 
-                    if not wav_tgt:
-                        wav_tgt = await call_tts_wav(mt_text, language=job["tgt_lang"])
-                        if wav_tgt:
-                            path_used = "default"
+                        if use_ref:
+                            wav_tgt = await call_tts_wav_with_ref(
+                                mt_text,
+                                language=job["tgt_lang"],
+                                speaker_wav_bytes=ref_wav,
+                                tts_url=TTS_URL,
+                            )
+                            if wav_tgt:
+                                path_used = "speaker_wav_ref"
+
+                        if not wav_tgt:
+                            # เลือก default speaker_url ตามเพศ (เฉพาะ non-TH)
+                            chosen = None
+                            if (
+                                session.gender == "female"
+                                and DEFAULT_SPEAKER_URL_FEMALE
+                            ):
+                                chosen = DEFAULT_SPEAKER_URL_FEMALE
+                            elif session.gender == "male" and DEFAULT_SPEAKER_URL_MALE:
+                                chosen = DEFAULT_SPEAKER_URL_MALE
+                            if chosen:
+                                wav_tgt = await call_tts_wav(
+                                    mt_text,
+                                    language=job["tgt_lang"],
+                                    speaker_url=chosen,
+                                )
+                                if wav_tgt:
+                                    path_used = f"default_{session.gender}_url"
+
+                        # สุดท้าย fallback XTTS default
+                        if not wav_tgt:
+                            wav_tgt = await call_tts_wav(
+                                mt_text, language=job["tgt_lang"]
+                            )
+                            if wav_tgt:
+                                path_used = "default"
 
                 t3b = time.time()
 
-                # ส่ง log ช่วยดีบัคกลับ client (หรือ print server-side ก็ได้)
+                # debug log
                 await session.safe_send_json(
                     {
                         "type": "debug",
                         "stage": "tts_ref_selection",
                         "segmentId": job["segment_id"],
-                        "use_ref": bool(use_ref and ref_wav),
-                        "speaker_url": bool(session.speaker_url),
+                        "path": path_used,
+                        "gender": session.gender,
                     }
                 )
-
                 if not session.alive:
                     continue
 
                 cur_token = uuid.uuid4().hex[:8]
                 await session.safe_send_json(
-                    {"type": "tts_start", "segmentId": job["segment_id"], "token": cur_token}
+                    {
+                        "type": "tts_start",
+                        "segmentId": job["segment_id"],
+                        "token": cur_token,
+                    }
                 )
                 await session.safe_send_json(
                     {
@@ -496,9 +583,11 @@ async def listener_worker(session: Session):
                         "latencyMs": {
                             "stt": job["stt_ms"],
                             # "mt": int((t3b - t3a) * 1000),
-                            "mt":  int((t2b - t2a) * 1000),
+                            "mt": int((t2b - t2a) * 1000),
                             "tts": int((t3b - t3a) * 1000),
-                            "e2e": job["stt_ms"] + int((t2b - t2a) * 1000) + int((t3b - t3a) * 1000),
+                            "e2e": job["stt_ms"]
+                            + int((t2b - t2a) * 1000)
+                            + int((t3b - t3a) * 1000),
                         },
                     }
                 )
@@ -543,6 +632,19 @@ async def process_segment_and_broadcast(speaker: Session, pcm: bytes):
 
     segment_id = f"seg-{uuid.uuid4().hex[:8]}"
     wav_bytes = await pcm_to_wav_bytes(pcm, SAMPLE_RATE)
+    # ---- gender detect (debounce ~1s) ----
+    now_ts = time.time()
+    if (now_ts - speaker._last_gender_ts) >= 1.0:
+        g, conf = await call_gender(wav_bytes)
+        # อัปเดตเมื่อมั่นใจพอหรือจาก unknown → อะไรก็ได้
+        if (g != "unknown" and conf >= 0.55) or speaker.gender == "unknown":
+            speaker.gender = g
+            speaker.gender_conf = conf
+            speaker._last_gender_ts = now_ts
+            # (optional) debug event กลับ client
+            await speaker.safe_send_json(
+                {"type": "gender_update", "gender": g, "confidence": conf}
+            )
 
     # --- STT (ของ "ผู้พูด") ---
     t0 = time.time()
@@ -686,17 +788,25 @@ async def ws_voice(ws: WebSocket):
 
                 if t == "set_target_lang":
                     session.target_lang = str(data.get("value") or "off")
-                    print("[GW] set_target_lang:", session.user_id, "→", session.target_lang)
+                    print(
+                        "[GW] set_target_lang:",
+                        session.user_id,
+                        "→",
+                        session.target_lang,
+                    )
 
                 elif t == "set_src_lang":
                     session.source_lang = str(data.get("value") or "auto")
 
                 elif t == "set_speaker_url":
                     raw = str(data.get("value") or "") or None
-                    session.speaker_url = (
-                        normalize_speaker_url(raw) if raw else None
+                    session.speaker_url = normalize_speaker_url(raw) if raw else None
+                    print(
+                        "[GW] set_speaker_url:",
+                        session.user_id,
+                        "→",
+                        session.speaker_url,
                     )
-                    print("[GW] set_speaker_url:", session.user_id, "→", session.speaker_url)
 
                 elif t == "audio_chunk":
                     # header for next binary (client will send bytes next)
@@ -774,9 +884,13 @@ async def ws_voice(ws: WebSocket):
                             session.voiced_run = 0
                             session.silence_run = 0
                             session.seg_start_ms = 0
-                            session.cooldown_until = time.time() + (COOLDOWN_MS / 1000.0)
+                            session.cooldown_until = time.time() + (
+                                COOLDOWN_MS / 1000.0
+                            )
 
-                            asyncio.create_task(process_segment_and_broadcast(session, pcm))
+                            asyncio.create_task(
+                                process_segment_and_broadcast(session, pcm)
+                            )
 
                         # ถ้าตัดแต่สั้นเกินไป → ทิ้ง segment นั้น
                         elif cut and not long_enough:
@@ -786,21 +900,27 @@ async def ws_voice(ws: WebSocket):
                             session.voiced_run = 0
                             session.silence_run = 0
                             session.seg_start_ms = 0
-                            session.cooldown_until = time.time() + (COOLDOWN_MS / 1000.0)
-                    session.feed_ref(frame, is_voiced)        
-                
+                            session.cooldown_until = time.time() + (
+                                COOLDOWN_MS / 1000.0
+                            )
+                    session.feed_ref(frame, is_voiced)
+
                 # ถ้ามีเศษเฟรมไม่ครบ 20ms → เก็บไว้รอเฟรมถัดไป
                 tail = raw[i:]
                 if tail:
                     session.buf.extend(tail)
-                    session.ms_acc += int(len(tail) / 2 / SAMPLES_PER_FRAME) * FRAME_MS  # ค่าประมาณ ไม่ซีเรียสมาก
+                    session.ms_acc += (
+                        int(len(tail) / 2 / SAMPLES_PER_FRAME) * FRAME_MS
+                    )  # ค่าประมาณ ไม่ซีเรียสมาก
 
     except WebSocketDisconnect:
         pass
     except Exception as ex:
         try:
             if session:
-                await session.safe_send_json({"type": "error", "code": "WS_ERR", "message": str(ex)})
+                await session.safe_send_json(
+                    {"type": "error", "code": "WS_ERR", "message": str(ex)}
+                )
         except Exception:
             pass
     finally:

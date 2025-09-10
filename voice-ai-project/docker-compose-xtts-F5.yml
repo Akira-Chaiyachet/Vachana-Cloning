@@ -1,0 +1,211 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      bash -lc 'set -euo pipefail;
+        for i in {1..60}; do
+          if (</dev/tcp/db/3306) 2>/dev/null; then
+            echo "[ok] DB tcp reachable";
+            break;
+          fi;
+          echo "[wait] DB not ready, retry...";
+          sleep 2;
+        done;
+        python manage.py migrate;
+        python manage.py runserver 0.0.0.0:8000 --noreload --nothreading'
+    working_dir: /app/frontend
+    volumes:
+      - .:/app
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  channels:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/frontend
+    command: >
+      sh -c "daphne -b 0.0.0.0 -p 8001 RVC_DJ.asgi:application"
+    volumes:
+      - .:/app
+    ports: ["8001:8001"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=RVC_DJ.settings
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket,sys; s=socket.socket(); s.settimeout(2); s.connect((\"127.0.0.1\",8001)); s.close()'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    depends_on:
+      - web
+      - gateway
+      - channels
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./frontend/staticfiles:/app/frontend/staticfiles
+      - ./frontend/media:/app/frontend/media
+      - ./frontend/dist:/app/frontend/dist
+
+  db:
+    image: mysql:8.0
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: voice_ai
+      MYSQL_USER: django_user
+      MYSQL_PASSWORD: VC@V-ai2025
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports: ["3306:3306"]
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin --protocol=TCP -h 127.0.0.1 -P 3306 ping --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports: ["6379:6379"]
+
+  stt:
+    build:
+      context: ./backend/models/stt
+      dockerfile: Dockerfile.stt
+    runtime: nvidia
+    environment: [ "NVIDIA_VISIBLE_DEVICES=all" ]
+    volumes:
+      - whisper_models:/root/.cache/whisper
+      - ./backend/models/stt:/app
+    working_dir: /app
+    ports: ["8002:8000"]
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  mt:
+    build:
+      context: ./backend/models/mt
+      dockerfile: Dockerfile.mt
+    runtime: nvidia
+    environment: [ "NVIDIA_VISIBLE_DEVICES=all" ]
+    volumes:
+      - ./backend/models/mt/ctranslate2-m2m100:/app/models/ctranslate2-m2m100
+      - ./backend/models/mt:/app
+    working_dir: /app
+    ports: ["8003:8000"]
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  # ===== XTTS เดิม (คงไว้เพื่อสลับได้) =====
+  tts:
+    build:
+      context: ./backend/models/tts
+      dockerfile: Dockerfile.tts
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COQUI_TOS_AGREED=1
+      - XTTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+      - DEFAULT_SPEAKER_WAV=/app/assets/default_speaker.wav
+    volumes:
+      - xtts_models:/root/.local/share/tts
+      - ./backend/models/tts:/app
+      - ./backend/models/tts/assets:/app/assets
+    working_dir: /app
+    ports: ["8004:8000"]
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  # ===== ใหม่: F5-TTS-THAI =====
+  tts_f5:
+    build:
+      context: ./backend/models/tts-f5
+      dockerfile: Dockerfile.F5
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      # เปลี่ยน ckpt/vocab ได้ตามต้องการผ่าน env
+      - F5_CKPT=hf://VIZINTZOR/F5-TTS-THAI/model_1000000.pt
+      - F5_VOCAB=/app/vocab/vocab.txt
+      - F5_VOCAB_IPA=/app/vocab/vocab_ipa.txt
+      - F5_USE_IPA=false
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+      - ./backend/models/tts-f5:/app
+    working_dir: /app
+    ports: ["8005:8000"]  # external 8005 -> internal 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  gender:
+    build:
+      context: ./backend/models/gender
+      dockerfile: Dockerfile
+    environment:
+      - GENDER_MODEL_CACHE=/app/models
+      - GENDER_MIN_SEC=0.5
+      - GENDER_F0_THRESHOLD=180.0
+    volumes:
+      - ./backend/models/gender:/app
+      - gender_models:/app/models
+    working_dir: /app
+    ports:
+      - "8006:8000"
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./backend/models/gateway
+      dockerfile: Dockerfile.gateway
+    environment:
+      - STT_URL=http://stt:8000/stt
+      - MT_URL=http://mt:8000/mt
+      - TTS_URL=http://tts:8000/tts
+      - F5_TTS_URL=http://tts_f5:8000/tts   # << เพิ่มบรรทัดนี้
+      - PYTHONUNBUFFERED=1
+      - GENDER_URL=http://gender:8000/detect
+      - DEFAULT_SPEAKER_URL_MALE=http://web:8000/media/voices/male_default.wav
+      - DEFAULT_SPEAKER_URL_FEMALE=http://web:8000/media/voices/female_default.wav
+    working_dir: /app
+    volumes:
+      - ./backend/models/gateway:/app
+    depends_on:
+      - stt
+      - mt
+      - tts_f5
+    ports: ["8010:8010"]
+    command: uvicorn main:app --host 0.0.0.0 --port 8010
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  whisper_models:
+  mt_models:
+  xtts_models:
+  hf_cache:
+  gender_models:

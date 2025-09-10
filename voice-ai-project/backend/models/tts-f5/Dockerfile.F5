@@ -1,0 +1,69 @@
+# Dockerfile.F5 — F5-TTS-THAI
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# ---- System deps ----
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-venv python3.11-dev \
+      build-essential git wget curl ffmpeg ca-certificates libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Python venv ----
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/root/.cache/huggingface \
+    PYTHONPATH=/app/src
+
+WORKDIR /app
+
+# ---- Copy requirements first (better cache) ----
+COPY requirements.txt /app/requirements.txt
+
+# ---- Upgrade pip ----
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip
+
+# ---- Install PyTorch (CUDA 12.1 wheels; compatible with 12.8 runtime) ----
+# Pin ให้คู่กัน: torch 2.3.1 / torchvision 0.18.1 / torchaudio 2.3.1
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir \
+      torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 \
+      --index-url https://download.pytorch.org/whl/cu121
+
+      # System deps (มีเพิ่มฟอนต์)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-venv python3.11-dev \
+      build-essential git wget curl ffmpeg ca-certificates libsndfile1 \
+      fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Install project deps ----
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r /app/requirements.txt
+    
+RUN pip install git+https://github.com/VYNCX/F5-TTS-THAI.git
+# ---- Copy code last ----
+# โครงสร้างที่คอนเทนเนอร์คาดหวัง:
+# /app
+#  ├─ main.py
+#  ├─ src/f5_tts/...
+#  └─ vocab/{vocab.txt,vocab_ipa.txt}
+COPY . /app
+
+# ---- Defaults (override ได้ใน compose) ----
+ENV F5_CKPT="hf://VIZINTZOR/F5-TTS-THAI/model_1000000.pt" \
+    F5_VOCAB="/app/vocab/vocab.txt" \
+    F5_VOCAB_IPA="/app/vocab/vocab_ipa.txt" \
+    F5_USE_IPA="false"
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
